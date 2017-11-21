@@ -1,0 +1,16 @@
+*.c
+*.o
+*~
+*.png
+*.nc
+*.tiff
+*.hdf
+*.pdf
+*.tiff
+*.zip
+*.tar*
+*.xz
+*.pyc
+*checkpoint*
+*.ipynb
+*__pycache__*
