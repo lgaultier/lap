@@ -132,22 +132,22 @@ def write_listracer_1d(wfile, T, p, listTr):
     dim_part = 'obs'
     dim_time = 'time'
     dim_time_hr = 'time_hr'
-    fid.createDimension(dim_part, numpy.shape(T.lon_lr)[1])
+    fid.createDimension(dim_part, numpy.shape(T['lon_lr'])[1])
     fid.createDimension(dim_time, None)
     if p.save_traj is True:
         fid.createDimension(dim_time_hr, numpy.shape(T.lon_hr)[0])
 
         # - Create and write Variables
         vlon = fid.createVariable('lon_hr', 'f4', (dim_time_hr, dim_part))
-        vlon[:, :] = T.lon_hr
+        vlon[:, :] = T['lon_hr']
         vlon.units = "deg E"
         vlon.long_name = 'High temporal resolution longitude'
         vlat = fid.createVariable('lat_hr', 'f4', (dim_time_hr, dim_part))
-        vlat[:, :] = T.lat_hr
+        vlat[:, :] = T['lat_hr']
         vlat.units = "deg N"
         vlat.long_name = 'High temporal resolution latitude'
         vmask = fid.createVariable('mask_hr', 'f4', (dim_time_hr, dim_part))
-        vmask[:, :] = T.mask_hr
+        vmask[:, :] = T['mask_hr']
         vtime = fid.createVariable('time_hr', 'f4', (dim_time_hr))
 
         vtime[:] = T.time_hr
@@ -157,32 +157,32 @@ def write_listracer_1d(wfile, T, p, listTr):
         if p.save_U is True:
             vu = fid.createVariable('zonal_velocity', 'f4', (dim_time_hr,
                                     dim_part), fill_value=fill_value)
-            vu[:, :] = T.vel_u_hr
+            vu[:, :] = T['vel_u_hr']
             vu.units = 'm/s'
             vu.long_name = 'High temporal resolution zonal velocity'
         if p.save_V is True:
             vv = fid.createVariable('meridional_velocity', 'f4',
                                     (dim_time_hr, dim_part),
                                     fill_value=fill_value)
-            vv[:, :] = T.vel_v_hr
+            vv[:, :] = T['vel_v_hr']
             vv.units = 'm/s'
             vv.long_name = 'High temporal resolution meridional velcity'
         if p.save_S is True:
             vS = fid.createVariable('Strain', 'f4', (dim_time_hr, dim_part),
                                     fill_value=fill_value)
-            vS[:, :] = T.S_hr
+            vS[:, :] = T['S_hr']
             vS.units = 's-1'
             vS.long_name = 'Strain'
         if p.save_RV is True:
             vRV = fid.createVariable('Vorticity', 'f4', (dim_time_hr,
                                      dim_part), fill_value=fill_value)
-            vRV[:, :] = T.RV_hr
+            vRV[:, :] = T['RV_hr']
             vRV.units = 's-1'
             vRV.long_name = 'Relative Vorticity'
         if p.save_OW is True:
             vOW = fid.createVariable('OW', 'f4', (dim_time_hr, dim_part),
                                      fill_value=fill_value)
-            vOW[:, :] = T.OW_hr
+            vOW[:, :] = T['OW_hr']
             vOW.units = 's-1'
             vOW.long_name = 'Okubo-Weiss'
 
@@ -191,14 +191,14 @@ def write_listracer_1d(wfile, T, p, listTr):
     vlat = fid.createVariable('lat', 'f4', (dim_time, dim_part),
                               fill_value=fill_value)
     vtime = fid.createVariable('time', 'f4', (dim_time), fill_value=fill_value)
-    vlon[:, :] = T.lon_lr
+    vlon[:, :] = T['lon_lr']
     vlon.units = "deg E"
-    vlat[:, :] = T.lat_lr
+    vlat[:, :] = T['lat_lr']
     vlat.units = "deg N"
-    vtime[:] = T.time
+    vtime[:] = T['time']
     vlon.units = "days"
     vmask = fid.createVariable('mask_lr', 'f4', (dim_time, dim_part))
-    vmask[:, :] = T.mask_lr
+    vmask[:, :] = T['mask_lr']
     if p.list_tracer is not None:
         for i in range(len(listTr)):
             vtra = fid.createVariable(p.listtracer[i], 'f4', (dim_time,

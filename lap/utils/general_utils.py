@@ -74,7 +74,7 @@ def init_empty_variables(p, grid, listTr, size, rank):
     return dim_hr, dim_lr, Gridsize, reducepart, i0, i1
 
 
-def gather_data_mpi(p, grid, list_var_adv, listGr, listTr, dim_lr, dim_hr,
+def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
                     comm, rank, size, grid_size):
 
     # Define local empty variables with the correct size
@@ -90,26 +90,9 @@ def gather_data_mpi(p, grid, list_var_adv, listGr, listTr, dim_lr, dim_hr,
     if listTr is not None:
         mod_advection.reordering1dmpi(p, listTr, listGr)
     comm.barrier()
-    lon_lr_local = comm.gather(list_var_adv['lon_lr'], root=0)
-    lat_lr_local = comm.gather(list_var_adv['lat_lr'], root=0)
-    mask_lr_local = comm.gather(list_var_adv['mask_lr'], root=0)
-    # i_hr_local = comm.gather(list_var_adv['iit'], root=0)
-    # j_hr_local = comm.gather(list_var_adv['ijt'], root=0)
-    lon_hr_local = comm.gather(list_var_adv['lon_hr'], root=0)
-    lat_hr_local = comm.gather(list_var_adv['lat_hr'], root=0)
-    mask_hr_local = comm.gather(list_var_adv['mask_hr'], root=0)
-    if p.save_S:
-        Slocal = comm.gather(list_var_adv['S_hr'], root=0)
-    if p.save_RV:
-        RVlocal = comm.gather(list_var_adv['RV_hr'], root=0)
-    if p.save_OW:
-        OWlocal = comm.gather(list_var_adv['OW_hr'], root=0)
-    if p.save_U:
-        ulocal = comm.gather(list_var_adv['u_hr'], root=0)
-    if p.save_U:
-        vlocal = comm.gather(list_var_adv['v_hr'], root=0)
-    if p.save_U:
-        hlocal = comm.gather(list_var_adv['h_hr'], root=0)
+    local = {}
+    for key, value in list_var_adv.items():
+        local[key] = comm.gather(value, root=0)
     if p.list_tracer is not None:
         nlist = len(listTr)
         for i in range(nlist):
@@ -118,28 +101,30 @@ def gather_data_mpi(p, grid, list_var_adv, listGr, listTr, dim_lr, dim_hr,
             Tr.newilocal = comm.gather(Tr.newiloc,  root=0)
             Tr.newjlocal = comm.gather(Tr.newjloc, root=0)
     if rank == 0:
-        drifter = grid
+        data['time_hr'] = list_var_adv['time_hr']
+        list_var_adv.remove('time_hr')
+        tstep = p.tadvection / p.output_step / abs(p.tadvection)
+        tstop = p.first_day + p.tadvection + tstep
+        data['time'] = numpy.arange(p.first_day, tstop, tstep)
         for irank in range(0, size):
+
             npixel = int((grid_size - 1)/size) + 1
             i0 = npixel * irank
             i1 = min(npixel*(irank + 1), grid_size)
-            drifter.lon_lr[:, i0:i1] = lon_lr_local[irank][:, :]
-            drifter.lat_lr[:, i0:i1] = lat_lr_local[irank][:, :]
-            drifter.mask_lr[:, i0:i1] = mask_lr_local[irank][:, :]
-            drifter.lon_hr[:, i0:i1] = lon_hr_local[irank][:, :]
-            drifter.lat_hr[:, i0:i1] = lat_hr_local[irank][:, :]
-            drifter.mask_hr[:, i0:i1] = mask_hr_local[irank][:, :]
-            drifter.vel_v_hr[:, i0:i1] = vlocal[irank][:, :]
-            drifter.vel_u_hr[:, i0:i1] = ulocal[irank][:, :]
-            drifter.hei_hr[:, i0:i1] = hlocal[irank][:, :]
-            # drifter.iit_lr[:, :, i0:i1] = i_hr_local[irank][:, :, :]
-            # drifter.ijt_lr[:, :, i0:i1] = j_hr_local[irank][:, :, :]
-            if p.save_S:
-                drifter.S_hr[:, i0:i1] = Slocal[irank][:, :]
-            if p.save_OW:
-                drifter.OW_hr[:, i0:i1] = OWlocal[irank][:, :]
-            if p.save_RV:
-                drifter.RV_hr[:, i0:i1] = RVlocal[irank][:, :]
+            for key, value in list_var_adv.items():
+                if irank == 0:
+                    if 'lr' in key:
+                        dim = dim_lr
+                    else:
+                        dim = dim_hr
+                data[key] = numpy.empty(dim)
+                ndim = len(dim)
+                if ndim == 1:
+                    data[key][i0:i1] = local[key][irank][:]
+                elif ndim == 2:
+                    data[key][:, i0:i1] = local[key][irank][:, :]
+                else:
+                    logger.error(f'Wrong dimension for variable {key}: {ndim}')
             if p.list_tracer is not None:
                 nlist = len(listTr)
                 for i in range(nlist):
@@ -147,40 +132,21 @@ def gather_data_mpi(p, grid, list_var_adv, listGr, listTr, dim_lr, dim_hr,
                     Tr.newvar[:, i0:i1] = Tr.newvarlocal[irank][:, :]
                     Tr.newi[:, i0:i1] = Tr.newilocal[irank][:, :]
                     Tr.newj[:, i0:i1] = Tr.newjlocal[irank][:, :]
-        tstep = p.tadvection / p.output_step / abs(p.tadvection)
-        tstop = p.first_day + p.tadvection + tstep
-        drifter.time = numpy.arange(p.first_day, tstop, tstep)
-        drifter.time_hr = list_var_adv['time_hr']
-        return drifter
+        return data
 
 
-def gather_data(p, grid, list_var_adv, listGr, listTr):
+def gather_data(p, list_var_adv, listGr, listTr):
     logger.info('No parallelisation')
     if listTr is not None:
         mod_advection.reordering1d(p, listTr, listGr)
-    drifter = grid
-    drifter.lon_hr = list_var_adv['lon_hr']
-    drifter.lat_hr = list_var_adv['lat_hr']
-    drifter.mask_hr = list_var_adv['mask_hr']
-    drifter.vel_v_hr = list_var_adv['v_hr']
-    drifter.vel_u_hr = list_var_adv['u_hr']
-    drifter.hei_hr = list_var_adv['h_hr']
-    drifter.lon_lr = list_var_adv['lon_lr']
-    drifter.lat_lr = list_var_adv['lat_lr']
-    drifter.mask_lr = list_var_adv['mask_lr']
-    # drifter.iit_lr = list_var_adv['iit']
-    # drifter.ijt_lr = list_var_adv['ijt']
-    if p.save_S:
-        drifter.S_hr = list_var_adv['S_hr']
-    if p.save_RV:
-        drifter.RV_hr = list_var_adv['RV_hr']
-    if p.save_OW:
-        drifter.OW_hr = list_var_adv['OW_hr']
+    data = {}
+    for key, value in list_var_adv.items():
+        data[key] = list_var_adv[key]
     tstep = p.tadvection / p.output_step / abs(p.tadvection)
     tstop = p.first_day + p.tadvection + tstep
-    drifter.time = numpy.arange(p.first_day, tstop, tstep)
-    drifter.time_hr = list_var_adv['time_hr']
-    return drifter
+    data['time'] = numpy.arange(p.first_day, tstop, tstep)
+    print(data.keys())
+    return data
 
 
 def make_list_particles(grid):

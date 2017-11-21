@@ -3,57 +3,71 @@ import numpy
 import lap.mod_advection as mod_advection
 import lap.mod_tools as mod_tools
 import lap.mod_io as mod_io
+import lap.utils.general_utils as utils
+import lap.utils.write_utils as write
+import lap.const as const
 import logging
 logger = logging.getLogger(__name__)
+
+
 
 def init_particles(plon, plat, dx):
     lonp = plon + dx
     lonm = plon - dx
     latp = plat + dx
     latm = plat - dx
-    4pa_lon = [lonm, lonp, lon, lon]
-    4pa_lat = [lat, lat, latm, latp]
-    return 4pa_lon, 4pa_lat
-
-
-def advection(p, npa_lon, npa_lat, VEL, su, sv, store=True):
-    num_pa = numpy.shape(npa_lon)
-    # npa_lon_end = numpy.empty(num_pa)
-    # npa_lat_end = numpy.empty(num_pa)
-
-    for i in range(num_pa):
-        lonpa = + npa_lon[i]
-        latpa = + npa_lat[i]
-        if store is True:
-	    npa_lon[i] = []
-	    npa_lat[i] = []
-        init = init_velocity(VEL, lonpa, latpa, su, sv)
-        (iu, ju), (iv, jv), dvcoord = init
-        (dVlatu, dVlatv, dVlonu, dVlonv) = dvcoord
-        dt = 0
-        while dt < abs(p.tadvection):
-            advect = mod_advection.advection_pa_timestep(p, lonpa, latpa, dt,
-                                                         mask, r, VEL,
-                                                         vcoord, dv, svel)
-            rcoord, vcoord, lonpa, latpa, mask = advect
-            dt += p.adv_time_step
-	    if store is True:
-		npa_lon[i].append(lonpa)
-		npa_lat[i].append(latpa)
-        if store is False
-            npa_lon[i] = lonpa
-            npa_lat[i] = latpa
-
+    npa_lon = [lonm, lonp, plon, plon]
+    npa_lat = [plat, plat, latm, latp]
     return npa_lon, npa_lat
 
 
-def deform_pa(4pa_lon, 4pa_lat, dx):
+def advection(p, npa_lon, npa_lat, VEL, store=True):
+    num_pa = numpy.shape(npa_lon)
+    su = numpy.shape(VEL.u)
+    sv = numpy.shape(VEL.v)
+    svel = (su, sv)
+    # npa_lon_end = numpy.empty(num_pa)
+    # npa_lat_end = numpy.empty(num_pa)
+    mask = 0
+    r = numpy.zeros((2, 1))
+    for i in range(num_pa[0]):
+        lonpa = + npa_lon[i]
+        latpa = + npa_lat[i]
+        if store is True:
+            npa_lon[i] = []
+            npa_lat[i] = []
+        init = mod_advection.init_velocity(VEL, lonpa, latpa, su, sv)
+        (iu, ju), (iv, jv), dvcoord = init
+        (dVlatu, dVlatv, dVlonu, dVlonv) = dvcoord
+        vcoord = (iu, ju, iv, jv)
+        dt = 0
+        sizeadvection = int(p.tadvection * p.adv_time_step)
+        while dt < abs(p.tadvection):
+            # # TODO: retrieve index t in velocity
+            advect = mod_advection.advection_pa_timestep(p, lonpa, latpa,
+                                                         int(dt), dt,
+                                                         mask, r, VEL,
+                                                         vcoord, dvcoord, svel,
+                                                         sizeadvection)
+            rcoord, vcoord, lonpa, latpa, mask = advect
+            dt += p.adv_time_step
+            if store is True:
+                npa_lon[i].append(lonpa)
+                npa_lat[i].append(latpa)
+        if store is False:
+            npa_lon[i] = lonpa
+            npa_lat[i] = latpa
+
+    return npa_lon, npa_lat, mask
+
+
+def deform_pa(npa_lon, npa_lat, dx):
     # Compute deformation matrix
     deform = numpy.zeros((2, 2))
-    deform[0, 0] = 4pa_lon[1] - 4pa_lon[0]
-    deform[0, 1] = 4pa_lat[1] - 4pa_lat[0]
-    deform[1, 0] = 4pa_lon[3] - 4pa_lon[2]
-    deform[1, 1] = 4pa_lat[3] - 4pa_lat[2]
+    deform[0, 0] = npa_lon[1] - npa_lon[0]
+    deform[0, 1] = npa_lat[1] - npa_lat[0]
+    deform[1, 0] = npa_lon[3] - npa_lon[2]
+    deform[1, 1] = npa_lat[3] - npa_lat[2]
     deform = deform * 2 / dx
 
     # Compute jacobian M * M^T
@@ -73,25 +87,29 @@ def ftle_pa(lon, lat, dx, tf):
     ftle = numpy.log(lmax) / abs(tf)
     return ftle, v1, v2
 
-def fsle_pa((lon, lat, df, dt, d0):
+def fsle_pa(lon, lat, df, dt, d0, advection_final):
     haversine = False
     if haversine is True:
         dx1 = mod_tools.haversine(lon[1][:], lon[0][:], lat[1][:], lat[0][:])
         dx2 = mod_tools.haversine(lon[3][:], lon[3][:], lat[3][:], lat[2][:])
     else:
-	dx1 = (lon[1][:] - lon[0][:])**2 + (lat[1][:] - lat[0][:]**2)
-	dx2 = (lon[3][:] - lon[2][:])**2 + (lat[3][:] - lat[2][:]**2)
+        dlon1 = numpy.array(lon[1][:]) - numpy.array(lon[0][:])
+        dlat1 = numpy.array(lat[1][:]) - numpy.array(lat[0][:])
+        dlon2 = numpy.array(lon[3][:]) - numpy.array(lon[2][:])
+        dlat2 = numpy.array(lat[3][:]) - numpy.array(lat[2][:])
+        dx1 = numpy.sqrt(dlon1**2 + dlat1**2)
+        dx2 = numpy.sqrt(dlon2**2 + dlat2**2)
     _max = numpy.maximum(dx1, dx2)
     tau = 0
     istep = 0
     while istep < len(_max):
-        if _max[istep] > df[0]:
+        if _max[istep] > df:
             tau = istep * dt
             break
         istep += 1
-    lonpa = lon[:][istep]
-    latpa = lat[:][istep]
-    if tau != 0
+    if tau != 0:
+        lonpa = [lon[0][istep], lon[1][istep], lon[2][istep], lon[3][istep]]
+        latpa = [lat[0][istep], lat[1][istep], lat[2][istep], lat[3][istep]]
         deform = numpy.zeros((2, 2))
         deform[0, 0] = lon[1][istep] - lon[0][istep]
         deform[0, 1] = lon[3][istep] - lon[2][istep]
@@ -99,18 +117,28 @@ def fsle_pa((lon, lat, df, dt, d0):
         deform[1, 1] = lat[3][istep] - lat[2][istep]
         lmax, _, _ = deform_pa (lonpa, latpa, d0)
     else:
-        lmax = df / dx
+        tau = advection_final
+        lmax = df / d0
     fsle = numpy.log(lmax) / tau
-    return fsle
+    return fsle, 0, 0
 
 
-def fsle(p):
+def lyapunov(p):
     # - Initialize variables from parameter file
     # ------------------------------------------
     mod_tools.make_default(p)
     comm = None
     p.parallelisation, size, rank, comm = utils.init_mpi(p.parallelisation)
-
+    if rank == 0:
+        data = {}
+    if p.FSLE is True:
+        method = fsle_pa
+        store = True
+        name_var = 'fsle'
+    else:
+        method = ftle_pa
+        store = False
+        name_var = 'ftle'
     # Make Grid
     if rank == 0:
         logger.info(f'Start time {datetime.datetime.now()}')
@@ -125,56 +153,62 @@ def fsle(p):
     VEL = mod_io.read_velocity(p)
 
     # For each point in Grid
-    grid.fsle = numpy.zeros(numpy.shape(grid.lon1d))
+    grid_size = numpy.shape(grid.lon1d)[0]
+    dim = (grid_size)
+    grid.fsle = numpy.zeros(dim)
     num_pa = numpy.shape(grid.lon1d)
-
-    for pa in range(num_pa):
+    init = utils.init_empty_variables(p, grid, None, size, rank)
+    _, _, grid_size, reducepart, i0, i1 = init
+    all_lambda = []
+    all_mask = []
+    data_r = {}
+    for pa in reducepart:
         lonpa = grid.lon1d[pa]
         latpa = grid.lat1d[pa]
         # advect four points around position
-        4palon, 4palat = init_particles(lonpa, latpa, p.delta0)
-        4palon, 4palat = advection(4palon, 4palat, VEL, su, sv, store=False)
+        npalon, npalat = init_particles(lonpa, latpa, p.delta0)
+        npalon, npalat, mask = advection(p, npalon, npalat, VEL, store=store)
+        if pa % 500 == 0:
+            mod_tools.update_progress(float(pa - i0)
+                                      / float(num_pa[0]), str(pa),
+                                      str(rank))
+
 
         # Compute FTLE
-        fsle = fsle_pa(4pa_lon, 4pa_lat, p.deltaf, p.delta0, p.adv_time_step)
-        grid.fsle[pa] = fsle
+        vlambda, _, _ = method(npalon, npalat, p.deltaf, p.delta0,
+                               p.adv_time_step, abs(p.tadvection))
+        #grid.fsle[pa] = fsle
+        all_lambda.append(vlambda)
+        all_mask.append(mask)
+    data_r[name_var] = all_lambda
+    data_r['mask'] = all_mask
+    if p.parallelisation is True:
+        drifter = utils.gather_data_mpi(p, data_r, None, None, _, dim, dim,
+                                        comm, rank, size, grid_size)
 
-
-def ftle(p):
-    # - Initialize variables from parameter file
-    # ------------------------------------------
-    mod_tools.make_default(p)
-    comm = None
-    p.parallelisation, size, rank, comm = utils.init_mpi(p.parallelisation)
-
-    # Make Grid
+    else:
+        drifter = utils.gather_data(p, data_r, None, None)
     if rank == 0:
-        logger.info(f'Start time {datetime.datetime.now()}')
-        logger.info(f'Loading grid for advection for processor {rank}')
-        grid = mod_io.make_grid(p)
-        # Make a list of particles out of the previous grid
-        utils.make_list_particles(grid)
-
-    # Read velocity
-    if rank == 0:
-        logger.info('Loading Velocity')
-    VEL = mod_io.read_velocity(p)
-
-
-    # For each point in Grid
-    grid.ftle = numpy.zeros(numpy.shape(grid.lon1d))
-    num_pa = numpy.shape(grid.lon1d)
-
-    for pa in range(num_pa):
-        lonpa = grid.lon1d[pa]
-        latpa = grid.lat1d[pa]
-        # advect four points around position
-        4palon, 4palat = init_particles(lonpa, latpa, p.deltax)
-        4palon, 4palat = advection(4palon, 4palat, VEL, su, sv, store=False)
-
-        # Compute FTLE
-        ftle, _, _ = ftle_pa(4pa_lon, 4pa_lat, p.deltax)
-        grid.ftle[pa] = ftle
-
-
+        data[name_var] = numpy.array(drifter[name_var]).reshape(numpy.shape(grid.lon))
+        data['mask'] = numpy.array(drifter['mask']).reshape(numpy.shape(grid.lon))
+        #drifter['fsle'
+        # Write FTLE / FSLE
+        data['lon'] = grid.lon
+        data['lat'] = grid.lat
+        data['time'] = numpy.array([p.first_day, ])
+        outfile = p.output
+        if p.FSLE is True:
+            description = ("Finite-Size Lyapunov Exponent computed using"
+                           "lap_toolbox")
+            write.write_velocity(data, outfile, description=description,
+                                 unit=const.unit, long_name=const.long_name,
+                                 fill_value=-1e36, FSLE=data[name_var],
+                                  time=data['time'])
+        else:
+            description = ("Finite-Time Lyapunov Exponent computed using"
+                           "lap_toolbox")
+            write.write_velocity(data, outfile, description=description,
+                                 unit=const.unit, long_name=const.long_name,
+                                 fill_value=-1e36, FTLE=data[name_var],
+                                 time=data['time'])
 

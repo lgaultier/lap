@@ -174,7 +174,8 @@ def init_full_traj(p, s0, s1):
     return lon_hr, lat_hr, mask_hr, S_hr, RV_hr, OW_hr, u_hr, v_hr, h_hr
 
 
-def advection_pa_timestep(p, lonpa, latpa, dt, mask, r, VEL, vcoord, dv, svel):
+def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
+                          svel, sizeadvection):
     dVlonu, dVlatu, dVlonv, dVlatv = dv
     iu, ju, iv, jv = vcoord
     su, sv = svel
@@ -207,7 +208,7 @@ def advection_pa_timestep(p, lonpa, latpa, dt, mask, r, VEL, vcoord, dv, svel):
     deltat = (p.adv_time_step * const.day2sec * p.tadvection
               / float(sizeadvection))
     transport = dlondt * deltat
-    turbulence = p.B * r[:, k] + p.sigma * r[:, k] * deltat
+    turbulence = p.B * rk + p.sigma * rk * deltat
     lonpa = lonpa + transport + turbulence[0]
     transport = dlatdt * deltat
     latpa = latpa + transport + turbulence[1]
@@ -292,10 +293,12 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 dt = 0
                 k = 0
                 while dt < p.output_step:
-                    advect = advection_pa_timestep(p, lonpa, latpa, dt, mask,
-                                                   r, VEL, vcoord, dv, svel)
+                    rk = r[:, k]
+                    advect = advection_pa_timestep(p, lonpa, latpa, t, dt,
+                                                   mask, rk, VEL, vcoord, dv,
+                                                   svel, sizeadvection)
                     rcoord, (iu, ju, iv, jv), lonpa, latpa, mask = advect
-                    rlonu, rlatu, rlonv, rlatv) = rcoord
+                    rlonu, rlatu, rlonv, rlatv = rcoord
 
                         # 2D interpolation of physical variable
                     # TODO handle enpty or 0d slice

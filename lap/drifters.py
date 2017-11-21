@@ -79,11 +79,11 @@ def run_drifter(p):
 
     # - Save output in netcdf file
     if p.parallelisation is True:
-        drifter = utils.gather_data_mpi(p, grid, list_var_adv, listGr, listTr,
+        drifter = utils.gather_data_mpi(p, list_var_adv, listGr, listTr,
                                         dim_lr, dim_hr, comm, rank, size,
                                         grid_size)
     else:
-        drifter = utils.gather_data(p, grid, list_var_adv, listGr, listTr)
+        drifter = utils.gather_data(p, list_var_adv, listGr, listTr)
 
     if rank == 0:
         mod_io.write_drifter(p, drifter, listTr)
