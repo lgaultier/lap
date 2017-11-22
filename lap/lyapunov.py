@@ -216,3 +216,4 @@ def lyapunov(p):
                            "lap_toolbox")
             mod_io.write_diagnostic_2d(p, data, description=description,
                                        FTLE=data[name_var], time=data['time'])
+        logger.info(f'Stop time {datetime.datetime.now()}')

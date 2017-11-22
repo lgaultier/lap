@@ -1,5 +1,4 @@
 import datetime
-import os
 import numpy
 import lap.utils.read_utils as read_utils
 
@@ -35,6 +34,7 @@ def compute_lavd(plon, plat, pvort, t0=0):
 
 
 def lagragian_diag(p):
+    logger.info(f'Start time {datetime.datetime.now()}')
     list_var = ['lon_hr', 'lat_hr', 'u_hr', 'RV_hr']
     dict_var = read_utils.read_trajectory(input_file, list_var)
     lon = dict_var['lon_hr']
@@ -52,3 +52,4 @@ def lagragian_diag(p):
         if 'Mezic' in p.diagnostic:
             mezic_strain = compute_mezic(lon[:, pa], lat[:, pa])
             mezic_all.append(mezic_strain)
+    logger.info(f'Stop time {datetime.datetime.now()}')
