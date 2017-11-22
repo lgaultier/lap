@@ -135,7 +135,7 @@ def write_listracer_1d(wfile, T, p, listTr):
     fid.createDimension(dim_part, numpy.shape(T['lon_lr'])[1])
     fid.createDimension(dim_time, None)
     if p.save_traj is True:
-        fid.createDimension(dim_time_hr, numpy.shape(T.lon_hr)[0])
+        fid.createDimension(dim_time_hr, numpy.shape(T['lon_hr'])[0])
 
         # - Create and write Variables
         vlon = fid.createVariable('lon_hr', 'f4', (dim_time_hr, dim_part))

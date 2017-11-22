@@ -104,7 +104,7 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
         data = {}
         if 'time_hr' in list_var_adv.keys():
             data['time_hr'] = list_var_adv['time_hr']
-            list_var_adv.remove('time_hr')
+            del list_var_adv['time_hr']
         tstep = p.tadvection / p.output_step / abs(p.tadvection)
         tstop = p.first_day + p.tadvection + tstep
         data['time'] = numpy.arange(p.first_day, tstop, tstep)
@@ -124,7 +124,10 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
                 if ndim == 1:
                     data[key][i0:i1] = local[key][irank][:]
                 elif ndim == 2:
-                    data[key][:, i0:i1] = local[key][irank][:, :]
+                    try:
+                        data[key][:, i0:i1] = local[key][irank][:, :]
+                    except:
+                        print(key)
                 else:
                     logger.error(f'Wrong dimension for variable {key}: {ndim}')
             if p.list_tracer is not None:

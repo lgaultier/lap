@@ -303,13 +303,15 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
 
                     # 2D interpolation of physical variable
                     # TODO handle enpty or 0d slice
-                    slice_iu = slice(iu, min(iu + 1, su[0] - 1))
-                    slice_iv = slice(iv, min(iv + 1, sv[0] - 1))
-                    slice_ju = slice(ju, min(ju + 1, su[1] - 1))
-                    slice_jv = slice(jv, min(jv + 1, sv[1] - 1))
+                    slice_iu = slice(iu, min(iu + 2, su[0] - 1))
+                    slice_iv = slice(iv, min(iv + 2, sv[0] - 1))
+                    slice_ju = slice(ju, min(ju + 2, su[1] - 1))
+                    slice_jv = slice(jv, min(jv + 2, sv[1] - 1))
                     if p.save_U is True:
-                        ums = mod_tools.lin_2Dinterp(VEL.us[t, slice_iu,
+                        try:
+                            ums = mod_tools.lin_2Dinterp(VEL.us[t, slice_iu,
                                                      slice_ju], rlonu, rlatu)
+                        except: import pdb ; pdb.set_trace()
                     if p.save_V is True:
                         vms = mod_tools.lin_2Dinterp(VEL.vs[t, slice_iv,
                                                      slice_jv], rlonv, rlatv)
