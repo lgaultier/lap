@@ -3,6 +3,8 @@ import os
 from math import sqrt, pi
 import lap.const as const
 import numpy
+import logging
+logger = logging.getLogger(__name__)
 
 
 def load_python_file(file_path):
@@ -105,7 +107,6 @@ def lin_1Dinterp(a, delta):
     if len(a) > 1:
         y = a[0]*(1 - delta) + a[1] * delta
     else:
-        # print('0d slice')
         y = a
     return y
 
@@ -128,7 +129,8 @@ def bissextile(year):
 
 def dinm(year, month):
     if month > 12:
-        sys.exit("wrong month in dinm")
+        logger.error("wrong month in dinm")
+        sys.exit(1)
     biss = bissextile(year)
     if (month == 4 or month == 6 or month == 9 or month == 11):
         daysinmonth = 30

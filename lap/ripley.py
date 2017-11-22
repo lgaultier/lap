@@ -51,4 +51,3 @@ def ripley(p):
         #gvec = gvec * area / (2 * math.pi * deltar)
         gvec[r] /= (len(x) ) ** 2
     gvec = gvec * area / (2 * math.pi * deltar)
-    

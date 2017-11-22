@@ -56,20 +56,3 @@ def run_lyapunov_script() ->None:
 
     p = mod_tools.load_python_file(file_param)
     lyapunov.lyapunov(p)
-
-
-def run_ftle_script() ->None:
-    ''' Compute FSLE. '''
-    import lap.lyapunov as lyapunov
-    handler.setLevel(logging.INFO)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
-    if len(sys.argv) < 2:
-        logger.error('Please specify a parameter file')
-        sys.exit(1)
-    else:
-        file_param = str(sys.argv[1])
-
-    p = mod_tools.load_python_file(file_param)
-    lyapunov.ftle(p)

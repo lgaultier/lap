@@ -4,6 +4,7 @@ import sys
 import lap.utils.read_utils as read_utils
 import lap.utils.write_utils as write_utils
 import lap.mod_tools as mod_tools
+import lap.const as const
 from scipy.ndimage import filters
 from scipy import interpolate
 from math import pi
@@ -455,6 +456,17 @@ def write_drifter(p, drifter, listTr):
     default_output = os.path.join(p.output_dir, file_default)
     p.output = getattr(p, 'output', default_output)
     write_utils.write_listracer_1d(p.output, drifter, p, listTr)
+
+
+def write_diagnostic_2d(p, data, description='', **kwargs):
+    start = int(data['time'][0])
+    stop = int(data['time'][-1])
+    file_default = f'{p.diagnostic}_{start}_{stop}.nc'
+    default_output = os.path.join(p.output_dir, file_default)
+    p.output = getattr(p, 'output', default_output)
+    write_utils.write_velocity(data, p.output, description=description,
+                               unit=const.unit, long_name=const.long_name,
+                               fill_value=-1e36, **kwargs)
 
 
 def write_advected_tracer(p, data_out):

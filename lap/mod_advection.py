@@ -232,7 +232,6 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
         Trac.newj = numpy.zeros((2, shape_lr[0], shape_lr[1]))
     su = (numpy.shape(VEL.Vlatu)[0], numpy.shape(VEL.Vlonu)[0])
     sv = (numpy.shape(VEL.Vlatv)[0], numpy.shape(VEL.Vlonv)[0])
-
     # # Loop on particles
     for pa in part:
         # # - Initialize final variables
@@ -276,6 +275,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             init = init_velocity(VEL, lonpa, latpa, su, sv)
             (iu, ju), (iv, jv), dvcoord = init
             (dVlatu, dVlatv, dVlonu, dVlonv) = dvcoord
+            vcoord = (iu, ju, iv, jv)
             # tmpu = VEL.u[0, iu, ju]
             # tmpv = VEL.v[0, iv, jv]
             # tmph = VEL.h[0, iu, ju]
@@ -295,12 +295,13 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 while dt < p.output_step:
                     rk = r[:, k]
                     advect = advection_pa_timestep(p, lonpa, latpa, t, dt,
-                                                   mask, rk, VEL, vcoord, dv,
-                                                   svel, sizeadvection)
+                                                   mask, rk, VEL, vcoord,
+                                                   dvcoord, (su, sv),
+                                                   sizeadvection)
                     rcoord, (iu, ju, iv, jv), lonpa, latpa, mask = advect
                     rlonu, rlatu, rlonv, rlatv = rcoord
 
-                        # 2D interpolation of physical variable
+                    # 2D interpolation of physical variable
                     # TODO handle enpty or 0d slice
                     slice_iu = slice(iu, min(iu + 1, su[0] - 1))
                     slice_iv = slice(iv, min(iv + 1, sv[0] - 1))
@@ -313,8 +314,8 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                         vms = mod_tools.lin_2Dinterp(VEL.vs[t, slice_iv,
                                                      slice_jv], rlonv, rlatv)
                     if p.stationary is False:
-                        VEL.ht = interpol_intime(VEL.h, t, (iu, jv), interp_dt,
-                                             su, sv)
+                        VEL.ht = interpol_intime(VEL.h, t, (iu, jv),
+                                                 dt / p.vel_step, su, sv)
                     else:
                         VEL.ht = no_interpol_intime(VEL.h, (iu, jv), su, sv)
                     H = mod_tools.lin_2Dinterp(VEL.ht, rlonv, rlatu)
@@ -377,15 +378,15 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                     Trac.newj[0, :, pa - i0] = p.fill_value
 
         if pa % 500 == 0:
-            mod_tools.update_progress(float(pa - i0)
-                                      / float(numpy.shape(part)[0]), str(pa),
-                                      str(rank))
+            perc = float(pa - i0) / float(numpy.shape(part)[0])
+            mod_tools.update_progress(perc, str(pa), str(rank))
         if p.save_traj:
             if pa == i0:
                 init = init_full_traj(p, numpy.shape(vlonpa)[0], i1 - i0)
 
                 lon_hr, lat_hr, mask_hr, S_hr, RV_hr, OW_hr, u_hr, v_hr, h_hr = init
-            if vlonpa[0] != vlonpa[1] or vlatpa[0] != vlatpa[1] or (not numpy.array(vmask).all()):
+            if (vlonpa[0] != vlonpa[1] or vlatpa[0] != vlatpa[1]
+                 or (not numpy.array(vmask).all())):
                 lon_hr[:, pa - i0] = numpy.transpose(vlonpa)
                 lat_hr[:, pa - i0] = numpy.transpose(vlatpa)
                 mask_hr[:, pa - i0] = numpy.transpose(vmask)
@@ -403,7 +404,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 RV_hr[:, pa - i0] = numpy.transpose(vRV)
             if p.save_OW is True:
                 OW_hr[:, pa - i0] = numpy.transpose(vOW)
-            #mask_hr[:, pa - i0] = numpy.transpose(vmask)
+            # mask_hr[:, pa - i0] = numpy.transpose(vmask)
     dict_output = {}
     if p.save_traj is True:
         dict_output['lon_hr'] = lon_hr
@@ -576,7 +577,7 @@ def reordering(Tr, grid, AMSR, p):
                     # ]=numpy.nan
     grid.var2[numpy.isnan(grid.var2)] = p.fill_value
     grid.var2[abs(grid.var2) > 50.] = p.fill_value
-    grid.var2 = numpy.ma.array(grid.var2, mask=(grid.var2==p.fill_value))
+    grid.var2 = numpy.ma.array(grid.var2, mask=(grid.var2 == p.fill_value))
     # grid.mask)
     grid.var = grid.var2
     # Tr.var2[0,:,:]=numpy.ma.array(Tr.var2[0,:,:], mask=Tr.mask)
@@ -599,8 +600,6 @@ def reordering1d(p, listTr, listGr):
             for time in range(nt):
                 realtime = (p.first_day + time * numpy.sign(p.tadvection))
                 tratime = numpy.argmin(abs(Tr.time - realtime))
-                # import pdb; pdb.set_trace()
-                # print(p.listtracer[i], tratime, time,numpy.shape(Tr.var) )
                 for pa in range(npa):
                     tra[time, pa, i] = Tr.var[tratime,
                                               int(Gr.newi[0, time, pa]),
@@ -625,8 +624,6 @@ def reordering1dmpi(p, listTr, listGr):
             for time in range(nt):
                 realtime = (p.first_day + time * numpy.sign(p.tadvection))
                 tratime = numpy.argmin(abs(Tr.time - realtime))
-                # import pdb; pdb.set_trace()
-                # print(p.listtracer[i], tratime, time,numpy.shape(Tr.var) )
                 for pa in range(npa):
                     tra[time, pa, i] = Tr.var[tratime,
                                               int(Gr.newi[0, time, pa]),
@@ -639,9 +636,7 @@ def reordering1dmpi(p, listTr, listGr):
 
 def nudging_AMSR(AMSR, lon, lat, tra, t, p):
     iamsr = numpy.argmin(abs(AMSR.latt - lat))
-    # if abs(AMSR.latt[iamsr]-lat[pa])>0.25: print AMSR.latt[iamsr], lat[pa]
     jamsr = numpy.argmin(abs(AMSR.lont - lon))
-    # if abs(AMSR.lont[jamsr]-lon[pa])>0.25: print AMSR.lont[jamsr], lon[pa]
     if not numpy.isnan(AMSR.tra[int(t * p.output_step), iamsr, jamsr]):
         tra = tra - p.gamma*(tra - AMSR.tra[int(t * p.output_step), iamsr,
                                             jamsr])

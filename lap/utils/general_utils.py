@@ -101,8 +101,10 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
             Tr.newilocal = comm.gather(Tr.newiloc,  root=0)
             Tr.newjlocal = comm.gather(Tr.newjloc, root=0)
     if rank == 0:
-        data['time_hr'] = list_var_adv['time_hr']
-        list_var_adv.remove('time_hr')
+        data = {}
+        if 'time_hr' in list_var_adv.keys():
+            data['time_hr'] = list_var_adv['time_hr']
+            list_var_adv.remove('time_hr')
         tstep = p.tadvection / p.output_step / abs(p.tadvection)
         tstop = p.first_day + p.tadvection + tstep
         data['time'] = numpy.arange(p.first_day, tstop, tstep)
@@ -145,7 +147,6 @@ def gather_data(p, list_var_adv, listGr, listTr):
     tstep = p.tadvection / p.output_step / abs(p.tadvection)
     tstop = p.first_day + p.tadvection + tstep
     data['time'] = numpy.arange(p.first_day, tstop, tstep)
-    print(data.keys())
     return data
 
 

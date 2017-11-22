@@ -1,13 +1,13 @@
 import os
 # -- Initialisation parameters -- ##
 # Parallelisation 
-parallelisation = False
+parallelisation = True
 # Make grid or get grid from file
 make_grid = True
 # Grid parameters to initialize particule positions in degrees 
 # [lonleft, lon_right, lon_step, lat_bottom, lat_top, lat_step]
 #parameter_grid = (289.,309., 0.04,32.0, 42.375, 0.04)
-parameter_grid = (289., 295., 0.10, 32.0, 44, 0.10)
+parameter_grid = (289., 290., 0.10, 36.0, 38, 0.10)
 # If make_grid is True, specify parameters to build grid
 # Define box (lon_right, lon_left, lat_bottom, lat_top) to extract data on
 # relevant area (box must be one degree bigger that area of interst to avoid
@@ -62,7 +62,7 @@ vel_step = 1.
 
 ## -- ADVECTION PARAMETER -- ## 
 # Time step for advection (in days)
-adv_time_step = 0.08
+adv_time_step = 0.02
 # Time length of advection
 tadvection = 25
 # parameters for random walk to simulate diffusion
@@ -76,9 +76,10 @@ gamma = 0.
 stationary = False
 
 # -- FSLE -- ##
-FSLE = True
+# Specify diagnostic, choices are 'FSLE', 'FTLE'
+diagnostic = 'FSLE'
 # Initial distance between particles
-delta0 = 0.05
+delta0 = 0.02
 # Final distance between particles
 deltaf = 0.6
 
@@ -88,9 +89,9 @@ deltaf = 0.6
 fill_value = -1e36
 # Set output file name and path
 output_dir = './'
-test = 'lyapunov'
+test = diagnostic
 start = int(first_day)
 stop = int(first_day + tadvection)
-output_file = f'{test}_advection_{start}.nc'
+output_file = f'{test}_{start}.nc'
 output = os.path.join(output_dir, output_file)
 

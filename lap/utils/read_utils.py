@@ -141,6 +141,7 @@ def read_time(filename, ntime, itime=None):
         logger.warn('No calendar in time attributes, standard calendar used')
         time_cal = u"gregorian"
     time = netCDF4.num2date(time, units=time_units, calendar=time_cal)
+    fid.close()
     return time
 
 
@@ -318,5 +319,9 @@ def read_trajectory(infile, list_var):
     dict_var = {}
     fid = netCDF4.Dataset(infile, 'r')
     for key in list_var:
-        dict_var[key] = fid.variables[key][:]
+        if key in fid.variables.keys():
+            dict_var[key] = fid.variables[key][:]
+        else:
+            logger.warn(f'variable {key} not found in file {infile}')
+    fid.close()
     return dict_var
