@@ -6,7 +6,7 @@ parallelisation = True
 make_grid = True
 # Grid parameters to initialize particule positions in degrees 
 # [lonleft, lon_right, lon_step, lat_bottom, lat_top, lat_step]
-#parameter_grid = (289.,309., 0.04,32.0, 42.375, 0.04)
+#parameter_grid = (289.,309., 0.10,32.0, 42.375, 0.10)
 parameter_grid = (289., 290., 0.10, 36.0, 38, 0.10)
 # If make_grid is True, specify parameters to build grid
 # Define box (lon_right, lon_left, lat_bottom, lat_top) to extract data on
@@ -77,7 +77,7 @@ stationary = False
 
 # -- FSLE -- ##
 # Specify diagnostic, choices are 'FSLE', 'FTLE'
-diagnostic = 'FSLE'
+diagnostic = 'FTLE'
 # Initial distance between particles
 delta0 = 0.02
 # Final distance between particles

@@ -49,12 +49,12 @@ def interpol_intime(arr, t, index_vel, interp_dt, su):
     result = numpy.zeros((2, 2))
     slice_t = slice(int(t), int(t+2))
     result[0, 0] = mod_tools.lin_1Dinterp(arr[slice_t, iu, ju], interp_dt)
-    result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju+1, su[1]-1)],
-                                          interp_dt)
-    result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(i u +1, su[0] - 1),
+    result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju + 1,
+                                              su[1] - 1)], interp_dt)
+    result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
                                           ju], interp_dt)
-    result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu+1, su[0]-1),
-                                          min(ju+1, su[1]-1)], interp_dt)
+    result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
+                                          min(ju + 1, su[1] - 1)], interp_dt)
     return result
 
 
@@ -98,7 +98,7 @@ def dist_topoints(lon, lat, lonpa, latpa, dvcoord, index, su):
         ju = max(ju - 1, 0)
         dVlon = lon[ju + 1] - lon[ju]
         rlon = (lonpa - lon[ju]) / (dVlon)
-    return rlon, rlat, iu, ju
+    return rlon, rlat, iu, ju, dVlon, dVlat
 
 
 def find_indice_tracer(listGr, newlon, newlat, timetmp, num_pa):
@@ -182,18 +182,18 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     # Temporal interpolation  for velocity
     interp_dt = dt / p.vel_step
     if p.stationary is False:
-        VEL.ut = interpol_intime(VEL.u, t, (iu, ju), interp_dt, su)
-        VEL.vt = interpol_intime(VEL.v, t, (iv, jv), interp_dt, sv)
+        VEL.ut = interpol_intime(VEL.u, t, [iu, ju], interp_dt, su)
+        VEL.vt = interpol_intime(VEL.v, t, [iv, jv], interp_dt, sv)
     else:
-        VEL.ut = no_interpol_intime(VEL.u, (iu, ju), su)
-        VEL.vt = no_interpol_intime(VEL.v, (iv, jv), sv)
+        VEL.ut = no_interpol_intime(VEL.u, [iu, ju], su)
+        VEL.vt = no_interpol_intime(VEL.v, [iv, jv], sv)
     # 2D Spatial interpolation for velocity
     dist = dist_topoints(VEL.Vlonu, VEL.Vlatu, lonpa, latpa,
-                         (dVlonu, dVlatu), (iu, ju), su)
-    rlonu, rlatu, iu, ju = dist
+                         [dVlonu, dVlatu], [iu, ju], su)
+    rlonu, rlatu, iu, ju, dVlonu, dVlatu = dist
     dist = dist_topoints(VEL.Vlonv, VEL.Vlatv, lonpa, latpa,
-                         (dVlonv, dVlatv), (iv, jv), sv)
-    rlonv, rlatv, iv, jv = dist
+                         [dVlonv, dVlatv], [iv, jv], sv)
+    rlonv, rlatv, iv, jv, dVlonv, dVlatv = dist
     dlondt = mod_tools.lin_2Dinterp(VEL.ut, rlonu, rlatu)
     dlatdt = mod_tools.lin_2Dinterp(VEL.vt, rlonv, rlatv)
     # Set velocity to 0 if particle is outside domain
@@ -202,8 +202,9 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
         dlondt = 0
         dlatdt = 0
         mask = 1
-    rcoord = (rlonu, rlatu, rlonv, rlatv)
-    vcoord = (iu, ju, iv, jv)
+    rcoord = [rlonu, rlatu, rlonv, rlatv]
+    vcoord = [iu, ju, iv, jv]
+    dvcoord= [dVlonu, dVlatu, dVlonv, dVlatv]
     # Propagate position of particle with velocity
     deltat = (p.adv_time_step * const.day2sec * p.tadvection
               / float(sizeadvection))
@@ -212,7 +213,7 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     lonpa = lonpa + transport + turbulence[0]
     transport = dlatdt * deltat
     latpa = latpa + transport + turbulence[1]
-    return rcoord, vcoord, lonpa, latpa, mask
+    return rcoord, vcoord, dvcoord, lonpa, latpa, mask
 
 
 def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
@@ -276,15 +277,12 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             (iu, ju), (iv, jv), dvcoord = init
             (dVlatu, dVlatv, dVlonu, dVlonv) = dvcoord
             vcoord = (iu, ju, iv, jv)
-            # tmpu = VEL.u[0, iu, ju]
-            # tmpv = VEL.v[0, iv, jv]
-            # tmph = VEL.h[0, iu, ju]
             if p.save_S or p.save_OW:
                 Stmp = math.sqrt(VEL.Sn[0, iv, ju]**2 + VEL.Ss[0, iu, jv]**2)
             if p.save_RV or p.save_OW:
                 RVtmp = VEL.RV[0, iu, jv]
             if p.save_OW:
-                OWtmp = vS**2 - vRV**2
+                OWtmp = Stmp**2 - RVtmp**2
 
             # # - Loop on the number of advection days
             # # Change the output step ?
@@ -292,15 +290,18 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             for t in range(0, int(abs(p.tadvection) / p.output_step - 1)):
                 dt = 0
                 k = 0
+                ind_t = t
+                if p.stationary:
+                    ind_t = 0
                 while dt < p.output_step:
                     rk = r[:, k]
                     advect = advection_pa_timestep(p, lonpa, latpa, t, dt,
                                                    mask, rk, VEL, vcoord,
                                                    dvcoord, (su, sv),
                                                    sizeadvection)
-                    rcoord, (iu, ju, iv, jv), lonpa, latpa, mask = advect
+                    rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
                     rlonu, rlatu, rlonv, rlatv = rcoord
-
+                    iu, ju, iv, jv = vcoord
                     # 2D interpolation of physical variable
                     # TODO handle enpty or 0d slice
                     slice_iu = slice(iu, min(iu + 2, su[0] - 1))
@@ -309,11 +310,11 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                     slice_jv = slice(jv, min(jv + 2, sv[1] - 1))
                     if p.save_U is True:
                         try:
-                            ums = mod_tools.lin_2Dinterp(VEL.us[t, slice_iu,
+                            ums = mod_tools.lin_2Dinterp(VEL.us[ind_t, slice_iu,
                                                      slice_ju], rlonu, rlatu)
                         except: import pdb ; pdb.set_trace()
                     if p.save_V is True:
-                        vms = mod_tools.lin_2Dinterp(VEL.vs[t, slice_iv,
+                        vms = mod_tools.lin_2Dinterp(VEL.vs[ind_t, slice_iv,
                                                      slice_jv], rlonv, rlatv)
                     if p.stationary is False:
                         VEL.ht = interpol_intime(VEL.h, t, (iu, jv),
@@ -324,16 +325,16 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                                                     sv[1]))
                     H = mod_tools.lin_2Dinterp(VEL.ht, rlonv, rlatu)
                     if p.save_S is True or p.save_OW is True:
-                        Sn = mod_tools.lin_2Dinterp(VEL.Sn[t, slice_iv,
+                        Sn = mod_tools.lin_2Dinterp(VEL.Sn[ind_t, slice_iv,
                                                     slice_ju], rlonu, rlatv)
-                        Ss = mod_tools.lin_2Dinterp(VEL.Ss[t, slice_iu,
+                        Ss = mod_tools.lin_2Dinterp(VEL.Ss[ind_t, slice_iu,
                                                     slice_jv], rlonv, rlatu)
-                        S = numpy.sqrt((Sn**2 + Ss**2))
+                        Stmp = numpy.sqrt((Sn**2 + Ss**2))
                     if p.save_RV is True or p.save_OW is True:
-                        RV = mod_tools.lin_2Dinterp(VEL.RV[t, slice_iu,
+                        RVtmp = mod_tools.lin_2Dinterp(VEL.RV[ind_t, slice_iu,
                                                     slice_jv], rlonv, rlatu)
                     if p.save_OW is True:
-                        OW = S**2 - RV**2
+                        OWtmp = Stmp**2 - RVtmp**2
 
                     # Store coordinates and physical variables at high
                     # temporal resolution
@@ -381,9 +382,9 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                     Trac.newi[0, :, pa - i0] = p.fill_value
                     Trac.newj[0, :, pa - i0] = p.fill_value
 
-        if pa % 500 == 0:
+        if pa % 200 == 0:
             perc = float(pa - i0) / float(numpy.shape(part)[0])
-            mod_tools.update_progress(perc, str(pa), str(rank))
+            mod_tools.update_progress(perc, f'{pa} particles', f'{rank} node')
         if p.save_traj:
             if pa == i0:
                 init = init_full_traj(p, numpy.shape(vlonpa)[0], i1 - i0)
@@ -410,6 +411,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 OW_hr[:, pa - i0] = numpy.transpose(vOW)
             # mask_hr[:, pa - i0] = numpy.transpose(vmask)
     dict_output = {}
+    mod_tools.update_progress(1, f'{len(part)} particles', f'{rank} node')
     if p.save_traj is True:
         dict_output['lon_hr'] = lon_hr
         dict_output['lat_hr'] = lat_hr

@@ -38,8 +38,11 @@ def init_empty_variables(p, grid, listTr, size, rank):
     # Sublist of particles when parallelised
     reducepart = numpy.arange(i0, i1)
     # Number of Timesteps to store
-    Timesize_lr = int(abs(p.tadvection) / p.output_step) + 1
-    Timesize_hr = int(abs(p.tadvection) / p.output_step / p.adv_time_step) + 1
+    Timesize_lr = int(abs(p.tadvection + 1) / p.output_step)
+    # initialization + advection for t in [0, tadvection] with adv_time_step
+    # time step
+    Timesize_hr = int(abs(p.tadvection + 1) / p.output_step / p.adv_time_step
+                      + 1)
     dim_hr = (Timesize_hr, Gridsize)
     dim_lr = (Timesize_lr, Gridsize)
     # Initialise number of tracer in list
@@ -119,7 +122,7 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
                         dim = dim_lr
                     else:
                         dim = dim_hr
-                data[key] = numpy.empty(dim)
+                    data[key] = numpy.empty(dim)
                 ndim = len(dim)
                 if ndim == 1:
                     data[key][i0:i1] = local[key][irank][:]
@@ -127,7 +130,7 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
                     try:
                         data[key][:, i0:i1] = local[key][irank][:, :]
                     except:
-                        print(key)
+                        import pdb ; pdb.set_trace()
                 else:
                     logger.error(f'Wrong dimension for variable {key}: {ndim}')
             if p.list_tracer is not None:

@@ -7,7 +7,7 @@ make_grid = True
 # Grid parameters to initialize particule positions in degrees 
 # [lonleft, lon_right, lon_step, lat_bottom, lat_top, lat_step]
 #parameter_grid = (289.,309., 0.04,32.0, 42.375, 0.04)
-parameter_grid = (282.,285., 0.10,32.0, 35, 0.10)
+parameter_grid = (285.,315., 0.02,32.0, 42, 0.02)
 # If make_grid is True, specify parameters to build grid
 # Define time output step (in days) for tracer
 output_step = 1.
@@ -70,7 +70,49 @@ list_vel = [ 'aviso_020819.nc',
           'aviso_020845.nc',
           'aviso_020846.nc',
           'aviso_020847.nc',
-          'aviso_020848.nc']
+          'aviso_020848.nc',
+          'aviso_020849.nc',
+          'aviso_020850.nc',
+          'aviso_020851.nc',
+          'aviso_020852.nc',
+          'aviso_020853.nc',
+          'aviso_020854.nc',
+          'aviso_020855.nc',
+          'aviso_020856.nc',
+          'aviso_020857.nc',
+          'aviso_020858.nc',
+          'aviso_020859.nc',
+          'aviso_020860.nc',
+          'aviso_020861.nc',
+          'aviso_020862.nc',
+          'aviso_020863.nc',
+          'aviso_020864.nc',
+          'aviso_020865.nc',
+          'aviso_020866.nc',
+          'aviso_020867.nc',
+          'aviso_020868.nc',
+          'aviso_020869.nc',
+          'aviso_020870.nc',
+          'aviso_020871.nc',
+          'aviso_020872.nc',
+          'aviso_020873.nc',
+          'aviso_020874.nc',
+          'aviso_020875.nc',
+          'aviso_020876.nc',
+          'aviso_020877.nc',
+          'aviso_020878.nc',
+          'aviso_020879.nc',
+          'aviso_020880.nc',
+          'aviso_020881.nc',
+          'aviso_020882.nc',
+          'aviso_020883.nc',
+          'aviso_020884.nc',
+          'aviso_020885.nc',
+          'aviso_020886.nc',
+          'aviso_020887.nc',
+          'aviso_020888.nc',
+          'aviso_020889.nc',
+          ]
 # Time step between two velocity files
 vel_step = 1.
 
@@ -78,7 +120,7 @@ vel_step = 1.
 # Time step for advection (in days)
 adv_time_step = 0.08
 # Time length of advection
-tadvection = 25
+tadvection = 50
 # parameters for random walk to simulate diffusion
 scale = 1.
 # Diffusion parameter (sigma = 0.00000035)
@@ -87,7 +129,7 @@ K = 0
 # Diffusion and source and sink using low resolution tracer information
 gamma = 0.
 # Stationary flow: True or False
-stationary = True
+stationary = False
 
 # -- OUTPUTS -- ##
 # Set value for nan
@@ -99,8 +141,8 @@ save_U = True
 save_V = True
 # Save diagnostic parameters
 save_S = True
-save_RV = False
-save_OW = False
+save_RV = True
+save_OW = True
 # Set output file name and path
 output_dir = './'
 test = 'aviso'

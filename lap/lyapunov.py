@@ -36,9 +36,9 @@ def advection(p, npa_lon, npa_lat, VEL, store=True):
             npa_lon[i] = []
             npa_lat[i] = []
         init = mod_advection.init_velocity(VEL, lonpa, latpa, su, sv)
-        (iu, ju), (iv, jv), dvcoord = init
-        (dVlatu, dVlatv, dVlonu, dVlonv) = dvcoord
-        vcoord = (iu, ju, iv, jv)
+        [iu, ju], [iv, jv], dvcoord = init
+        [dVlatu, dVlatv, dVlonu, dVlonv] = dvcoord
+        vcoord = [iu, ju, iv, jv]
         dt = 0
         sizeadvection = p.tadvection / p.adv_time_step
         while dt < abs(p.tadvection):
@@ -48,7 +48,7 @@ def advection(p, npa_lon, npa_lat, VEL, store=True):
                                                          mask, r, VEL,
                                                          vcoord, dvcoord, svel,
                                                          sizeadvection)
-            rcoord, vcoord, lonpa, latpa, mask = advect
+            rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
             dt += p.adv_time_step
             if store is True:
                 npa_lon[i].append(lonpa)
