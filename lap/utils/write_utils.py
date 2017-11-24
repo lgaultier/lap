@@ -150,21 +150,21 @@ def write_listracer_1d(wfile, T, p, listTr):
         vmask[:, :] = T['mask_hr']
         vtime = fid.createVariable('time_hr', 'f4', (dim_time_hr))
 
-        vtime[:] = T.time_hr
+        vtime[:] = T['time_hr']
         vtime.units = "days"
         vtime.long_name = ('High temporal resolution time from the reference'
                            'time')
         if p.save_U is True:
             vu = fid.createVariable('zonal_velocity', 'f4', (dim_time_hr,
                                     dim_part), fill_value=fill_value)
-            vu[:, :] = T['vel_u_hr']
+            vu[:, :] = T['u_hr']
             vu.units = 'm/s'
             vu.long_name = 'High temporal resolution zonal velocity'
         if p.save_V is True:
             vv = fid.createVariable('meridional_velocity', 'f4',
                                     (dim_time_hr, dim_part),
                                     fill_value=fill_value)
-            vv[:, :] = T['vel_v_hr']
+            vv[:, :] = T['v_hr']
             vv.units = 'm/s'
             vv.long_name = 'High temporal resolution meridional velcity'
         if p.save_S is True:

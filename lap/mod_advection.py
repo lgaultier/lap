@@ -43,30 +43,30 @@ def init_velocity(VEL, lonpa, latpa, su, sv):
     return (iu, ju), (iv, jv), dvcoord
 
 
-def interpol_intime(arr, t, index_vel, interp_dt, su, sv):
+def interpol_intime(arr, t, index_vel, interp_dt, su):
     '''Extract 4 neighbors and interpolate in time between two time steps'''
     (iu, ju) = index_vel
     result = numpy.zeros((2, 2))
     slice_t = slice(int(t), int(t+2))
     result[0, 0] = mod_tools.lin_1Dinterp(arr[slice_t, iu, ju], interp_dt)
-    result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju+1, sv[1]-1)],
+    result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju+1, su[1]-1)],
                                           interp_dt)
-    result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu+1, su[0]-1), ju],
-                                          interp_dt)
+    result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(i u +1, su[0] - 1),
+                                          ju], interp_dt)
     result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu+1, su[0]-1),
-                                          min(ju+1, sv[1]-1)], interp_dt)
+                                          min(ju+1, su[1]-1)], interp_dt)
     return result
 
 
-def no_interpol_intime(arr, index_vel, su, sv):
+def no_interpol_intime(arr, index_vel, su):
     '''Extract 4 neighbors, no interpolation in time (used for
     stationary fields).'''
     (iu, ju) = index_vel
     result = numpy.zeros((2, 2))
     result[0, 0] = arr[0, iu, ju]
-    result[0, 1] = arr[0, iu, min(ju+1, sv[1]-1)]
-    result[1, 0] = arr[0, min(iu+1, su[0]-1), ju]
-    result[1, 1] = arr[0, min(iu+1, su[0]-1), min(ju+1, sv[1]-1)]
+    result[0, 1] = arr[0, iu, min(ju + 1, su[1] - 1)]
+    result[1, 0] = arr[0, min(iu + 1, su[0] - 1), ju]
+    result[1, 1] = arr[0, min(iu + 1, su[0] - 1), min(ju + 1, su[1] - 1)]
     return result
 
 
@@ -182,11 +182,11 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     # Temporal interpolation  for velocity
     interp_dt = dt / p.vel_step
     if p.stationary is False:
-        VEL.ut = interpol_intime(VEL.u, t, (iu, ju), interp_dt, su, su)
-        VEL.vt = interpol_intime(VEL.v, t, (iv, jv), interp_dt, sv, sv)
+        VEL.ut = interpol_intime(VEL.u, t, (iu, ju), interp_dt, su)
+        VEL.vt = interpol_intime(VEL.v, t, (iv, jv), interp_dt, sv)
     else:
-        VEL.ut = no_interpol_intime(VEL.u, (iu, ju), su, su)
-        VEL.vt = no_interpol_intime(VEL.v, (iv, jv), sv, sv)
+        VEL.ut = no_interpol_intime(VEL.u, (iu, ju), su)
+        VEL.vt = no_interpol_intime(VEL.v, (iv, jv), sv)
     # 2D Spatial interpolation for velocity
     dist = dist_topoints(VEL.Vlonu, VEL.Vlatu, lonpa, latpa,
                          (dVlonu, dVlatu), (iu, ju), su)
@@ -317,9 +317,11 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                                                      slice_jv], rlonv, rlatv)
                     if p.stationary is False:
                         VEL.ht = interpol_intime(VEL.h, t, (iu, jv),
-                                                 dt / p.vel_step, su, sv)
+                                                 dt / p.vel_step, (su[0],
+                                                 sv[1]))
                     else:
-                        VEL.ht = no_interpol_intime(VEL.h, (iu, jv), su, sv)
+                        VEL.ht = no_interpol_intime(VEL.h, (iu, jv), (su[0],
+                                                    sv[1]))
                     H = mod_tools.lin_2Dinterp(VEL.ht, rlonv, rlatu)
                     if p.save_S is True or p.save_OW is True:
                         Sn = mod_tools.lin_2Dinterp(VEL.Sn[t, slice_iv,

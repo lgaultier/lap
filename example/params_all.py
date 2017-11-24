@@ -7,7 +7,7 @@ make_grid = True
 # Grid parameters to initialize particule positions in degrees 
 # [lonleft, lon_right, lon_step, lat_bottom, lat_top, lat_step]
 #parameter_grid = (289.,309., 0.04,32.0, 42.375, 0.04)
-parameter_grid = (289.,295., 0.25,32.0, 44, 0.25)
+parameter_grid = (282.,285., 0.10,32.0, 35, 0.10)
 # If make_grid is True, specify parameters to build grid
 # Define time output step (in days) for tracer
 output_step = 1.
@@ -87,7 +87,7 @@ K = 0
 # Diffusion and source and sink using low resolution tracer information
 gamma = 0.
 # Stationary flow: True or False
-stationary = False
+stationary = True
 
 # -- OUTPUTS -- ##
 # Set value for nan
