@@ -206,8 +206,8 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     vcoord = [iu, ju, iv, jv]
     dvcoord= [dVlonu, dVlatu, dVlonv, dVlatv]
     # Propagate position of particle with velocity
-    deltat = (p.adv_time_step * const.day2sec * p.tadvection
-              / float(sizeadvection))
+    deltat = (p.adv_time_step * const.day2sec) # * p.tadvection
+              #/ float(sizeadvection))
     transport = dlondt * deltat
     turbulence = p.B * rk + p.sigma * rk * deltat
     lonpa = lonpa + transport + turbulence[0]

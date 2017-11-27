@@ -7,7 +7,7 @@ make_grid = True
 # Grid parameters to initialize particule positions in degrees 
 # [lonleft, lon_right, lon_step, lat_bottom, lat_top, lat_step]
 #parameter_grid = (289.,309., 0.10,32.0, 42.375, 0.10)
-parameter_grid = (289., 290., 0.10, 36.0, 38, 0.10)
+parameter_grid = (289., 291., 0.04, 36.0, 38, 0.04)
 # If make_grid is True, specify parameters to build grid
 # Define box (lon_right, lon_left, lat_bottom, lat_top) to extract data on
 # relevant area (box must be one degree bigger that area of interst to avoid
@@ -62,7 +62,7 @@ vel_step = 1.
 
 ## -- ADVECTION PARAMETER -- ## 
 # Time step for advection (in days)
-adv_time_step = 0.02
+adv_time_step = 0.05
 # Time length of advection
 tadvection = 25
 # parameters for random walk to simulate diffusion
@@ -73,13 +73,13 @@ K = 0
 # Diffusion and source and sink using low resolution tracer information
 gamma = 0.
 # Stationary flow: True or False
-stationary = False
+stationary = True
 
 # -- FSLE -- ##
 # Specify diagnostic, choices are 'FSLE', 'FTLE'
-diagnostic = 'FTLE'
+diagnostic = 'FSLE'
 # Initial distance between particles
-delta0 = 0.02
+delta0 = 0.04
 # Final distance between particles
 deltaf = 0.6
 

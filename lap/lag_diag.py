@@ -23,23 +23,32 @@ def compute_mezic(plon, plat, t0=0):
     return xt0, yt0
 
 
-def compute_lavd(plon, plat, pvort, t0=0):
+def compute_lavd(plon, plat, ptime, pvort, mean_vort, t0=0):
     ntime, npa = numpy.shape(plon)
     lavd = numpy.zeros((ntime - t0, npa))
+    lavd_time = numpy.zeros((ntime - t0))
     mean_vort = numpy.mean(pvort, axes=2)
+    tini = t0 + 1
     for t in range(ntime - t0):
-        mvort_t = pvort[t, :] - mean_vort[t]
-        mvort_t0 = pvort[t0, :] - mean_vort[t0]
-        lavd[t, :] = mvort_t - mvort_t0
+        tf = t + t0 + 2
+        lavd_tmp = numpy.sum(numpy.abs(pvort[tini: tf, :]
+                             - mean_vort[tini: tf, numpy.newaxis]), axis=0)
+        lavd_t0 = numpy.abs(pvort[tinipvort[t0, :] - mean_vort[t0]) / 2
+        lavd_t = numpy.abs(pvort[tinipvort[tf + 1, :] - mean_vort[tf + 1]) / 2
+        lavd_tmp = lavd_tmp + lavd_t0 + lavd_t
+        lavd_time[t] = ptime[tf + 1] - ptime[t0]
+        lavd[t, :] = lavd_tmp
+    return lavd, lavd_time
 
 
 def lagragian_diag(p):
     logger.info(f'Start time {datetime.datetime.now()}')
-    list_var = ['lon_hr', 'lat_hr', 'u_hr', 'RV_hr']
+    list_var = ['lon_hr', 'lat_hr', 'time_hr', 'u_hr', 'Vorticity']
     dict_var = read_utils.read_trajectory(input_file, list_var)
     lon = dict_var['lon_hr']
     lat = dict_var['lat_hr']
-    vort = dict_var['RV_hr']
+    vort = dict_var['Vorticity']
+    time_part = dict_var['time_hr']
     num_t, num_pa = numpy.shape(lon)
     metx_all = []
     mety_all = []
@@ -52,4 +61,6 @@ def lagragian_diag(p):
         if 'Mezic' in p.diagnostic:
             mezic_strain = compute_mezic(lon[:, pa], lat[:, pa])
             mezic_all.append(mezic_strain)
+    if 'LAVD' in p.diagnostic
+        lavd, lavd_t = compute_lavd(lon, lat, ptime, pvort, mean_vort)
     logger.info(f'Stop time {datetime.datetime.now()}')

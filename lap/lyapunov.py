@@ -24,7 +24,7 @@ def advection(p, npa_lon, npa_lat, VEL, store=True):
     num_pa = numpy.shape(npa_lon)
     su = numpy.shape(VEL.u)
     sv = numpy.shape(VEL.v)
-    svel = (su, sv)
+    svel = [su, sv]
     # npa_lon_end = numpy.empty(num_pa)
     # npa_lat_end = numpy.empty(num_pa)
     mask = 0
@@ -62,6 +62,9 @@ def advection(p, npa_lon, npa_lat, VEL, store=True):
 
 def deform_pa(npa_lon, npa_lat, dx):
     # Compute deformation matrix
+    #    mata(1,:) = xip1j(:) - xim1j(:)
+    #      mata(2,:) = xijp1(:) - xijm1(:)
+    #        mata(:,:) = mata(:,:) * factor
     deform = numpy.zeros((2, 2))
     deform[0, 0] = npa_lon[1] - npa_lon[0]
     deform[0, 1] = npa_lat[1] - npa_lat[0]
@@ -70,17 +73,34 @@ def deform_pa(npa_lon, npa_lat, dx):
     deform = deform * 2 / dx
 
     # Compute jacobian M * M^T
-    # jacob = deform * numpy.transpose(deform)
-    jacob = numpy.transpose(deform) * deform
+    jacob = numpy.matmul(deform, numpy.transpose(deform))
+    # jacob = numpy.transpose(deform) * deform
 
     # Compute eigenvalues l1 and l2 and eigenvectors v1 and v2
-    l1, l2 = numpy.linalg.eigvals(jacob)
+    lmean = (jacob[0, 0] + jacob[1, 1]) / 2.
+    lprod = jacob[0, 0] * jacob[1, 1] - jacob[0, 1] * jacob[1, 0]
+    dl = numpy.sqrt(lmean * lmean - lprod)
+    l1 = lmean + dl
+    l2 = lmean - dl
+    #l1, l2 = numpy.linalg.eigvals(jacob)
     lmax = numpy.sqrt(max(abs(l1), abs(l2)))
     v1, v2 = numpy.linalg.eig(jacob)
+
+    '''
+    ! Compute eigenvalues l1 and l2 of matd
+    lmean =  ( matd(1,1) + matd(2,2) ) * half
+    lprod = matd(1,1) * matd(2,2) - matd(1,2) * matd(2,1)
+    dl = SQRT ( lmean * lmean  - lprod )
+    l1 = lmean + dl ; l2 = lmean - dl
+
+    ! Compute Lyapunov exponent
+    lmax = MAX(ABS(l1),ABS(l2))
+    ftle = LOG(SQRT(lmax))/ABS(tend-tstart)
+    '''
     return lmax, v1, v2
 
 
-def ftle_pa(lon, lat, df, dt, d0, tf):
+def ftle_pa(lon, lat, df, d0, dt, tf):
     # Compute eigenvalues and vector
     lmax, v1, v2 = deform_pa(lon, lat, d0)
     # Compute FTLE
@@ -88,7 +108,7 @@ def ftle_pa(lon, lat, df, dt, d0, tf):
     return ftle, v1, v2
 
 
-def fsle_pa(lon, lat, df, dt, d0, tf):
+def fsle_pa(lon, lat, df, d0, dt, tf):
     haversine = False
     if haversine is True:
         dx1 = mod_tools.haversine(lon[1][:], lon[0][:], lat[1][:], lat[0][:])
