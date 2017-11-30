@@ -56,7 +56,6 @@ def advection(p, npa_lon, npa_lat, VEL, store=True):
         if store is False:
             npa_lon[i] = lonpa
             npa_lat[i] = latpa
-
     return npa_lon, npa_lat, mask
 
 
