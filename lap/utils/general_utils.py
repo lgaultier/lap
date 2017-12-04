@@ -38,7 +38,7 @@ def init_empty_variables(p, grid, listTr, size, rank):
     # Sublist of particles when parallelised
     reducepart = numpy.arange(i0, i1)
     # Number of Timesteps to store
-    Timesize_lr = int(abs(p.tadvection + 1) / p.output_step)
+    Timesize_lr = int(abs(p.tadvection + 1) / p.output_step + 1)
     # initialization + advection for t in [0, tadvection] with adv_time_step
     # time step
     Timesize_hr = int(abs(p.tadvection + 1) / p.output_step / p.adv_time_step

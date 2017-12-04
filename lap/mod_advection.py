@@ -224,7 +224,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
         grid.dlat = 10.
     # # Initialize empty matrices
     sizeadvection = int(abs(p.tadvection) / p.output_step)
-    shape_lr = (sizeadvection + 1, i1 - i0)
+    shape_lr = (sizeadvection + 2, i1 - i0)
     lon_lr = numpy.empty(shape_lr)
     lat_lr = numpy.empty(shape_lr)
     mask_lr = numpy.ones(shape_lr, dtype=bool)
@@ -287,10 +287,10 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             # # - Loop on the number of advection days
             # # Change the output step ?
             mask = 0
-            for t in range(0, int(abs(p.tadvection) / p.output_step - 1)):
+            for t in range(0, int(abs(p.tadvection) / p.output_step + 1)):
                 dt = 0
                 k = 0
-                ind_t = t
+                ind_t = + t
                 if p.stationary:
                     ind_t = 0
                 while dt < p.output_step:
@@ -305,9 +305,17 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                     # 2D interpolation of physical variable
                     # TODO handle enpty or 0d slice
                     slice_iu = slice(iu, min(iu + 2, su[0] - 1))
+                    #if len(slice_iu) < 2:
+                    #    slice_iu = slice(su[0] - 2, su[0])
                     slice_iv = slice(iv, min(iv + 2, sv[0] - 1))
+                    #if len(slice_iv) < 2:
+                    #    slice_iv = slice(sv[0] - 2, sv[0])
                     slice_ju = slice(ju, min(ju + 2, su[1] - 1))
+                    #if len(slice_ju) < 2:
+                    #    slice_ju = slice(su[1] - 2, su[1])
                     slice_jv = slice(jv, min(jv + 2, sv[1] - 1))
+                    #if len(slice_jv) < 2:
+                    #    slice_jv = slice(sv[1] - 2, sv[1])
                     if p.save_U is True:
                         try:
                             ums = mod_tools.lin_2Dinterp(VEL.us[ind_t, slice_iu,

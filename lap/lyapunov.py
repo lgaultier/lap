@@ -223,6 +223,8 @@ def lyapunov(p):
         data['mask'] = drifter['mask'].reshape(shape_grid)
         # Write FTLE / FSLE
         data['lon'] = grid.lon
+        data['lon2'] = grid.lon1d.reshape(shape_grid)
+        data['lat2'] = grid.lat1d.reshape(shape_grid)
         data['lat'] = grid.lat
         data['time'] = numpy.array([p.first_day, ])
         if isFSLE is True:
@@ -234,5 +236,5 @@ def lyapunov(p):
             description = ("Finite-Time Lyapunov Exponent computed using"
                            "lap_toolbox")
             mod_io.write_diagnostic_2d(p, data, description=description,
-                                       FTLE=data[name_var], time=data['time'])
+                                       FTLE=data[name_var], time=data['time'], lon2=data['lon2'], lat2=data['lat2'])
         logger.info(f'Stop time {datetime.datetime.now()}')
