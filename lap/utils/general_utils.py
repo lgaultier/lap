@@ -130,7 +130,7 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
                     try:
                         data[key][:, i0:i1] = local[key][irank][:, :]
                     except:
-                        import pdb ; pdb.set_trace()
+                        logger.info(f'{key} has dimension {numpy.shape(local[key][irank])}')
                 else:
                     logger.error(f'Wrong dimension for variable {key}: {ndim}')
             if p.list_tracer is not None:

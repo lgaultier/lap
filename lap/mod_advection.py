@@ -287,98 +287,99 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             # # - Loop on the number of advection days
             # # Change the output step ?
             mask = 0
-            for t in range(0, int(abs(p.tadvection) / p.output_step + 1)):
-                dt = 0
-                k = 0
-                ind_t = + t
+            for t in numpy.arange(0, int(abs(p.tadvection) / p.output_step + 1), p.adv_time_step):
+                dt = t - t%p.vel_step
+                k = int(t)
+                ind_t = + int(t)
                 if p.stationary:
                     ind_t = 0
-                while dt < p.output_step:
-                    rk = r[:, k]
-                    advect = advection_pa_timestep(p, lonpa, latpa, t, dt,
-                                                   mask, rk, VEL, vcoord,
-                                                   dvcoord, (su, sv),
-                                                   sizeadvection)
-                    rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
-                    rlonu, rlatu, rlonv, rlatv = rcoord
-                    iu, ju, iv, jv = vcoord
-                    # 2D interpolation of physical variable
-                    # TODO handle enpty or 0d slice
-                    slice_iu = slice(iu, min(iu + 2, su[0] - 1))
-                    #if len(slice_iu) < 2:
-                    #    slice_iu = slice(su[0] - 2, su[0])
-                    slice_iv = slice(iv, min(iv + 2, sv[0] - 1))
-                    #if len(slice_iv) < 2:
-                    #    slice_iv = slice(sv[0] - 2, sv[0])
-                    slice_ju = slice(ju, min(ju + 2, su[1] - 1))
-                    #if len(slice_ju) < 2:
-                    #    slice_ju = slice(su[1] - 2, su[1])
-                    slice_jv = slice(jv, min(jv + 2, sv[1] - 1))
-                    #if len(slice_jv) < 2:
-                    #    slice_jv = slice(sv[1] - 2, sv[1])
-                    if p.save_U is True:
-                        try:
-                            ums = mod_tools.lin_2Dinterp(VEL.us[ind_t, slice_iu,
-                                                     slice_ju], rlonu, rlatu)
-                        except: import pdb ; pdb.set_trace()
-                    if p.save_V is True:
-                        vms = mod_tools.lin_2Dinterp(VEL.vs[ind_t, slice_iv,
-                                                     slice_jv], rlonv, rlatv)
-                    if p.stationary is False:
-                        VEL.ht = interpol_intime(VEL.h, t, (iu, jv),
-                                                 dt / p.vel_step, (su[0],
-                                                 sv[1]))
-                    else:
-                        VEL.ht = no_interpol_intime(VEL.h, (iu, jv), (su[0],
-                                                    sv[1]))
-                    H = mod_tools.lin_2Dinterp(VEL.ht, rlonv, rlatu)
-                    if p.save_S is True or p.save_OW is True:
-                        Sn = mod_tools.lin_2Dinterp(VEL.Sn[ind_t, slice_iv,
-                                                    slice_ju], rlonu, rlatv)
-                        Ss = mod_tools.lin_2Dinterp(VEL.Ss[ind_t, slice_iu,
-                                                    slice_jv], rlonv, rlatu)
-                        Stmp = numpy.sqrt((Sn**2 + Ss**2))
-                    if p.save_RV is True or p.save_OW is True:
-                        RVtmp = mod_tools.lin_2Dinterp(VEL.RV[ind_t, slice_iu,
-                                                    slice_jv], rlonv, rlatu)
-                    if p.save_OW is True:
-                        OWtmp = Stmp**2 - RVtmp**2
+                #while dt < p.output_step:
+                rk = r[:, k]
+                advect = advection_pa_timestep(p, lonpa, latpa, t, dt,
+                                               mask, rk, VEL, vcoord,
+                                               dvcoord, (su, sv),
+                                               sizeadvection)
+                rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
+                rlonu, rlatu, rlonv, rlatv = rcoord
+                iu, ju, iv, jv = vcoord
+                # 2D interpolation of physical variable
+                # TODO handle enpty or 0d slice
+                slice_iu = slice(iu, min(iu + 2, su[0] - 1))
+                #if len(slice_iu) < 2:
+                #    slice_iu = slice(su[0] - 2, su[0])
+                slice_iv = slice(iv, min(iv + 2, sv[0] - 1))
+                #if len(slice_iv) < 2:
+                #    slice_iv = slice(sv[0] - 2, sv[0])
+                slice_ju = slice(ju, min(ju + 2, su[1] - 1))
+                #if len(slice_ju) < 2:
+                #    slice_ju = slice(su[1] - 2, su[1])
+                slice_jv = slice(jv, min(jv + 2, sv[1] - 1))
+                #if len(slice_jv) < 2:
+                #    slice_jv = slice(sv[1] - 2, sv[1])
+                if p.save_U is True:
+                    try:
+                        ums = mod_tools.lin_2Dinterp(VEL.us[ind_t, slice_iu,
+                                                 slice_ju], rlonu, rlatu)
+                    except: import pdb ; pdb.set_trace()
+                if p.save_V is True:
+                    vms = mod_tools.lin_2Dinterp(VEL.vs[ind_t, slice_iv,
+                                                 slice_jv], rlonv, rlatv)
+                if p.stationary is False:
+                    VEL.ht = interpol_intime(VEL.h, ind_t, (iu, jv),
+                                             dt / p.vel_step, (su[0],
+                                             sv[1]))
+                else:
+                    VEL.ht = no_interpol_intime(VEL.h, (iu, jv), (su[0],
+                                                sv[1]))
+                H = mod_tools.lin_2Dinterp(VEL.ht, rlonv, rlatu)
+                if p.save_S is True or p.save_OW is True:
+                    Sn = mod_tools.lin_2Dinterp(VEL.Sn[ind_t, slice_iv,
+                                                slice_ju], rlonu, rlatv)
+                    Ss = mod_tools.lin_2Dinterp(VEL.Ss[ind_t, slice_iu,
+                                                slice_jv], rlonv, rlatu)
+                    Stmp = numpy.sqrt((Sn**2 + Ss**2))
+                if p.save_RV is True or p.save_OW is True:
+                    RVtmp = mod_tools.lin_2Dinterp(VEL.RV[ind_t, slice_iu,
+                                                slice_jv], rlonv, rlatu)
+                if p.save_OW is True:
+                    OWtmp = Stmp**2 - RVtmp**2
 
-                    # Store coordinates and physical variables at high
-                    # temporal resolution
-                    if p.save_traj is True:
-                        vlonpa.append(lonpa)
-                        vlatpa.append(latpa)
-                        time = (p.first_day + (dt + t * p.output_step)
-                                * p.tadvection / float(sizeadvection))
-                        vtime.append(time)
-                        vu.append(ums)
-                        vv.append(vms)
-                        vh.append(H)
-                        vmask.append(mask)
-                        if p.save_S:
-                            vS.append(Stmp)
-                        else:
-                            vS = 0
-                        if p.save_RV:
-                            vRV.append(RVtmp)
-                        else:
-                            vRV = 0
-                        if p.save_OW:
-                            vOW.append(OWtmp)
-                        else:
-                            vOW = 0
-                    dt += p.adv_time_step
-                    k += 1
+                # Store coordinates and physical variables at high
+                # temporal resolution
+                if p.save_traj is True:
+                    vlonpa.append(lonpa)
+                    vlatpa.append(latpa)
+                    time = (p.first_day + (t * p.output_step)
+                            * p.tadvection / float(sizeadvection))
+                    vtime.append(time)
+                    vu.append(ums)
+                    vv.append(vms)
+                    vh.append(H)
+                    vmask.append(mask)
+                    if p.save_S is True:
+                        vS.append(Stmp)
+                    else:
+                        vS = 0
+                    if p.save_RV is True:
+                        vRV.append(RVtmp)
+                    else:
+                        vRV = 0
+                    if p.save_OW is True:
+                        vOW.append(OWtmp)
+                    else:
+                        vOW = 0
+                #dt += p.adv_time_step
+                #k += 1
                 # -- Store new longitude and new latitude at each output_step
-                lon_lr[t + 1, pa - i0] = lonpa
-                lat_lr[t + 1, pa - i0] = latpa
-                mask_lr[t + 1, pa - i0] = mask
-                timetmp = t + 1
-                if listGr is not None:
-                    find_indice_tracer(listGr, lon_lr[timetmp, pa - i0],
-                                       lat_lr[timetmp, pa - i0],
-                                       timetmp, pa - i0)
+                if (t % p.output_step + dt > 1):
+                    lon_lr[int(t) + 1, pa - i0] = lonpa
+                    lat_lr[int(t) + 1, pa - i0] = latpa
+                    mask_lr[int(t) + 1, pa - i0] = mask
+                    timetmp = int(t) + 1
+                    if listGr is not None:
+                        find_indice_tracer(listGr, lon_lr[timetmp, pa - i0],
+                                           lat_lr[timetmp, pa - i0],
+                                           timetmp, pa - i0)
         else:
             # If particle does not exist, set all values to fill_value
             timetmp = 1
