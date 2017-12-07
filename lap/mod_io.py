@@ -461,7 +461,7 @@ def write_drifter(p, drifter, listTr):
 def write_diagnostic_2d(p, data, description='', **kwargs):
     start = int(data['time'][0])
     stop = int(data['time'][-1])
-    file_default = f'{p.diagnostic}_{start}_{stop}.nc'
+    file_default = f'{p.diagnostic[0]}_{start}_{stop}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     p.output = getattr(p, 'output', default_output)
     write_utils.write_velocity(data, p.output, description=description,

@@ -44,12 +44,17 @@ def compute_lavd(plon, plat, ptime, pvort, mean_vort, t0=0):
 def lagragian_diag(p):
     logger.info(f'Start time {datetime.datetime.now()}')
     list_var = ['lon_hr', 'lat_hr', 'time_hr', 'u_hr', 'Vorticity']
-    dict_var = read_utils.read_trajectory(input_file, list_var)
+    dict_var = read_utils.read_trajectory(p.output, list_var)
     lon = dict_var['lon_hr']
     lat = dict_var['lat_hr']
     vort = dict_var['Vorticity']
     time_part = dict_var['time_hr']
     num_t, num_pa = numpy.shape(lon)
+    if p.make_grid is False:
+        grid = mod_io.read_grid_netcdf(p)
+    else:
+        grid = mod_io.make_grid(p)
+    shape_grid = numpy.shape(grid.lon)
     metx_all = []
     mety_all = []
     mezic_all = []
@@ -61,6 +66,31 @@ def lagragian_diag(p):
         if 'Mezic' in p.diagnostic:
             mezic_strain = compute_mezic(lon[:, pa], lat[:, pa])
             mezic_all.append(mezic_strain)
+    if 'MET' in p.diagnostic:
+        metx_2d = numpy.array(metx_all).reshape(grid_shape)
+        mety_2d = numpy.array(mety_all).reshape(grid_shape)
+    else:
+        metx_2d = None
+        mety_2d = None
+    if 'Mezic' in p.diagnostic:
+        mezic_2D = numpy.array(mezic_all).reshape(grid_shape)
+    else:
+        mezic_2D = None
+
     if 'LAVD' in p.diagnostic
         lavd, lavd_t = compute_lavd(lon, lat, ptime, pvort, mean_vort)
+        lavd_2D = numpy.zeros((numpy.shape(lavd)[0], grid_shape[0],
+                               grid_shape[1]))
+        for t in range(numpy.shape(lavd)[0]):
+            lavd_2D[t, :, :] = lavd[t, :].reshape(grid_shape)
+    else
+        lavd_2D = None
+    time = numpy.arange(t0, ntime)
+    data={}
+    data['lon'] = grid.lon
+    data['lat'] = grid.lat
+    description = 'lagrangian diagnostics'
+    mod_io.write_diagnostic_2d(p, data, description=description, METX=metx_2D,
+                               METY=mety_2D, MEZIC=mezic_2D, LAVD=lavd_2D,
+                               time=time)
     logger.info(f'Stop time {datetime.datetime.now()}')
