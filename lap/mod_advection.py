@@ -292,8 +292,8 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             # # - Loop on the number of advection days
             # # Change the output step ?
             mask = 0
-            
-            for t in numpy.arange(0, int(abs(p.tadvection) / p.output_step + 1), p.adv_time_step):
+            tstop = int(abs(p.tadvection) / p.output_step + 1)
+            for t in numpy.arange(0, tstop, p.adv_time_step):
                 dt = t - t%p.vel_step
                 k = int(t)
                 ind_t = + int(t)

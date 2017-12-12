@@ -330,7 +330,12 @@ def read_velocity(p, get_time=None):
         else:
             logger.error('Undefined Velocity file type')
             sys.exit(1)
-        VEL.read_vel(size_filter=p.vel_filter)
+        if t == 0:
+            VEL.read_vel(size_filter=p.vel_filter)
+            slice_x = VEL.slice_x
+            slice_y = VEL.slice_y
+        else:
+            VEL.read_vel(size_filter=p.vel_filter, slice_xy=(slice_x, slice_y))
         # TODO: to change
         try:
             VEL.read_var(size_filter=p.vel_filter)
@@ -347,11 +352,11 @@ def read_velocity(p, get_time=None):
         # VEL.varu) and (abs(VEL.varu)>10) and (abs(VEL.varv)>10)]
         # VEL.varu *=1.3
         # VEL.varv *=1.3
-        mask = numpy.ma.getmaskarray(VEL.varu) | numpy.ma.getmaskarray(VEL.varv)
+        mask = (numpy.ma.getmaskarray(VEL.varu)
+                | numpy.ma.getmaskarray(VEL.varv)
+                | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv))
         VEL.varu[mask] = 0
         VEL.varv[mask] = 0
-        VEL.varu[numpy.isnan(VEL.varu)] = 0
-        VEL.varv[numpy.isnan(VEL.varv)] = 0
         # VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
         # VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
         try:

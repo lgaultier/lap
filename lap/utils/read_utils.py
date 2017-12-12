@@ -170,27 +170,31 @@ class velocity_netcdf():
                 indx = numpy.where((self.lon0[:] > box[0])
                                    & (self.lon0[:] < box[1]))[0]
                 self.slice_x = slice(indx[0], indx[-1] + 1)
-                print(self.slice_x)
                 indy = numpy.where((self.lat0[:] > box[2])
                                    & (self.lat0[:] < box[3]))[0]
                 self.slice_y = slice(indy[0], indy[-1] + 1)
-                print(self.slice_y)
             else:
                 logger.error('provide a valid box [lllon, urlon, lllat, urlat]'
                              )
                 sys.exit(1)
+        else:
+            self.slice_x = None
+            self.slice_y = None
 
         if self.box is not None:
             self.lon0 = self.lon0[self.slice_x]
             self.lat0 = self.lat0[self.slice_y]
         self.lon, self.lat = (self.lon0[:], self.lat0[:])
-        return self.slice_x, self.slice_y
+        return None
 
     def read_vel(self, index=None, time=0, missing_value=None,
-                 size_filter=None):
+                 size_filter=None, slice_xy=None):
         '''Read data velocity'''
-        self.slice_x = slice(360, 600)
-        self.slice_y = slice(440, 580)
+        if slice_xy is None:
+            self.read_coord()
+        else:
+            self.slice_x = slice_xy[0]
+            self.slice_y = slice_xy[1]
         varu = read_var(self.file, self.nvaru, index=None, time=0,
                         depth=0, missing_value=missing_value)
         varv = read_var(self.file, self.nvarv, index=None, time=0,
@@ -199,19 +203,36 @@ class velocity_netcdf():
             varu = filters.gaussian_filter(varu, sigma=size_filter)
             varv = filters.gaussian_filter(varv, sigma=size_filter)
         if self.box is not None:
+            if slice_xy is None:
+                self.read_coord()
+            else:
+                self.slice_x = slice_xy[0]
+                self.slice_y = slice_xy[1]
             varu = varu[self.slice_y, self.slice_x]
             varv = varv[self.slice_y, self.slice_x]
+        else:
+            self.slice_x = None
+            self.slice_y = None
         self.varu = varu
         self.varv = varv
         return None
 
-    def read_var(self, index=None, time=0, missing_value=None):
+    def read_var(self, index=None, time=0, missing_value=None,
+                 slice_xy=None):
         '''Read data variable'''
-        self.slice_x = slice(360, 600)
-        self.slice_y = slice(440, 580)
+        if slice_xy is None:
+            self.slice_x, self.slice_y = self.read_coord()
+        else:
+            self.slice_x = slice_xy[0]
+            self.slice_y = slice_xy[1]
         var = read_var(self.file, self.nvar, index=None, time=0, depth=0,
                             missing_value=missing_value)
         if self.box is not None:
+            if slice_xy is None:
+                self.slice_x, self.slice_y = self.read_coord()
+            else:
+                self.slice_x = slice_xy[0]
+                self.slice_y = slice_xy[1]
             self.var = var[self.slice_y, self.slice_x]
         return None
 
