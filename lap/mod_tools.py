@@ -106,8 +106,11 @@ def update_progress(progress, arg1, arg2):
 def lin_1Dinterp(a, delta):
     if len(a) > 1:
         y = a[0]*(1 - delta) + a[1] * delta
+    elif len(a) == 1:
+        y = a[0]
     else:
-        y = a
+        raise Exception('empty array in 1d interpolation.')
+        #sys.exit(1)
     return y
 
 
@@ -267,7 +270,7 @@ def convert(x, y, u, v):
     dy = y1 - y0
 
     # Return the velocity in degrees/s
-    return (dx + 180) % 360 - 180, dy
+    return numpy.mod(dx + 180.,  360.) - 180., dy
 
 
 def convert1d(x, y, u, v):

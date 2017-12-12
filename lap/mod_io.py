@@ -224,11 +224,12 @@ def make_mask(p):
     if p.vel_format == 'regular_netcdf':
         VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
                                          varv=p.name_u, lon=p.name_lon,
-                                         lat=p.name_lat)
+                                         lat=p.name_lat, box=p.box)
+
     elif p.vel_format == 'nemo':
         VEL = read_utils.nemo_netcdf(filename=filename, varu=p.name_u,
                                      varv=p.name_v, lon=p.name_lon,
-                                     lat=p.name_lat)
+                                     lat=p.name_lat, box=p.box)
 
     VEL.read_coord()
     VEL.read_vel()
@@ -278,11 +279,11 @@ def read_velocity(p, get_time=None):
     if p.vel_format == 'regular_netcdf':
         VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
                                          varv=p.name_v, lon=p.name_lon,
-                                         lat=p.name_lat)
+                                         lat=p.name_lat, box=p.box)
     elif p.vel_format == 'nemo':
         VEL = read_utils.nemo_netcdf(filename=filename, varu=p.name_u,
                                      varv=p.name_v, lon=p.name_lon,
-                                     lat=p.name_lat)
+                                     lat=p.name_lat, box=p.box)
     else:
         logger.error(f'{p.vel_format} format is not handled')
         sys.exit(1)
@@ -298,7 +299,7 @@ def read_velocity(p, get_time=None):
     if p.stationary is True:
         num_steps = 1
     else:
-        num_steps = int(abs(p.tadvection) / p.vel_step)
+        num_steps = int(abs(p.tadvection) / p.vel_step) + 1
     shape_vel_u = (num_steps, numpy.shape(lat2du)[0],
                    numpy.shape(lon2du)[1])
     shape_vel_v = (num_steps, numpy.shape(lat2dv)[0],
@@ -319,11 +320,13 @@ def read_velocity(p, get_time=None):
         if p.vel_format == 'regular_netcdf':
             VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
                                              varv=p.name_v, lon=p.name_lon,
-                                             lat=p.name_lat, var=p.name_h)
+                                             lat=p.name_lat, var=p.name_h,
+                                             box=p.box)
         elif p.vel_format == 'nemo':
             VEL = read_utils.nemo_netcdf(filename=filename, varu=p.name_u,
                                          varv=p.name_v, lon=p.name_lon,
-                                         lat=p.name_lat, var=p.name_h)
+                                         lat=p.name_lat, var=p.name_h,
+                                         box=p.box)
         else:
             logger.error('Undefined Velocity file type')
             sys.exit(1)
@@ -335,19 +338,22 @@ def read_velocity(p, get_time=None):
             pass
         if t == num_steps - 1:
             VEL.read_coord()
-            VEL.Vlonu = (VEL.lon[:] + 360) % 360
+            VEL.Vlonu = numpy.mod(VEL.lon[:] + 360., 360.)
             VEL.Vlatu = VEL.lat[:]
-            VEL.Vlonv = (VEL.lon[:] + 360) % 360
+            VEL.Vlonv = numpy.mod(VEL.lon[:] + 360., 360.)
             VEL.Vlatv = VEL.lat[:]
         # # TODO A CHANGER , Initialize u and v here
         # VEL.masku=numpy.ma.masked_where(VEL.varu), VEL.varu[numpy.isnan(
         # VEL.varu) and (abs(VEL.varu)>10) and (abs(VEL.varv)>10)]
         # VEL.varu *=1.3
         # VEL.varv *=1.3
+        mask = numpy.ma.getmaskarray(VEL.varu) | numpy.ma.getmaskarray(VEL.varv)
+        VEL.varu[mask] = 0
+        VEL.varv[mask] = 0
         VEL.varu[numpy.isnan(VEL.varu)] = 0
         VEL.varv[numpy.isnan(VEL.varv)] = 0
-        VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
-        VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
+        # VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
+        # VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
         try:
             VEL.var[numpy.where(abs(VEL.var) > 100)] = numpy.nan
         except:

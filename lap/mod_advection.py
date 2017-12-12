@@ -48,13 +48,16 @@ def interpol_intime(arr, t, index_vel, interp_dt, su):
     (iu, ju) = index_vel
     result = numpy.zeros((2, 2))
     slice_t = slice(int(t), int(t+2))
-    result[0, 0] = mod_tools.lin_1Dinterp(arr[slice_t, iu, ju], interp_dt)
-    result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju + 1,
-                                              su[1] - 1)], interp_dt)
-    result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
-                                          ju], interp_dt)
-    result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
-                                          min(ju + 1, su[1] - 1)], interp_dt)
+    try:
+        result[0, 0] = mod_tools.lin_1Dinterp(arr[slice_t, iu, ju], interp_dt)
+        result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju + 1,
+                                                  su[1] - 1)], interp_dt)
+        result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
+                                              ju], interp_dt)
+        result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
+                                              min(ju + 1, su[1] - 1)], interp_dt)
+    except:
+        import pdb ; pdb.set_trace()
     return result
 
 
@@ -196,6 +199,8 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     rlonv, rlatv, iv, jv, dVlonv, dVlatv = dist
     dlondt = mod_tools.lin_2Dinterp(VEL.ut, rlonu, rlatu)
     dlatdt = mod_tools.lin_2Dinterp(VEL.vt, rlonv, rlatv)
+    if dlondt == 0 or dlatdt == 0:
+        import pdb ; pdb.set_trace()
     # Set velocity to 0 if particle is outside domain
     if (rlonu < 0 or rlonu > 1 or rlatu < 0 or rlatu > 1
           or rlonv < 0 or rlonv > 1 or rlatv < 0 or rlatv > 1):
@@ -287,6 +292,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             # # - Loop on the number of advection days
             # # Change the output step ?
             mask = 0
+            
             for t in numpy.arange(0, int(abs(p.tadvection) / p.output_step + 1), p.adv_time_step):
                 dt = t - t%p.vel_step
                 k = int(t)

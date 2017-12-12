@@ -76,7 +76,11 @@ def run_drifter(p):
     # - Perform advection
     list_var_adv = mod_advection.advection(reducepart, VEL, p, i0, i1, listGr,
                                            grid, rank=rank, size=size)
-
+    import numpy
+    print(dim_hr)
+    dim_hr = numpy.shape(list_var_adv['lon_hr'])
+    dim_lr = numpy.shape(list_var_adv['lon_lr'])
+    print(dim_hr)
     # - Save output in netcdf file
     if p.parallelisation is True:
         drifter = utils.gather_data_mpi(p, list_var_adv, listGr, listTr,

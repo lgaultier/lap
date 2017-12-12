@@ -67,52 +67,52 @@ def read_var(filename, var, index=None, time=0, depth=0, missing_value=None):
     # - Read variable
     if index is None:
         if ndim == 1:
-            T = numpy.array(fid.variables[var][:]).squeeze()
+            T = numpy.ma.array(fid.variables[var][:]).squeeze()
         elif ndim == 2:
-            T = numpy.array(fid.variables[var][:, :]).squeeze()
+            T = numpy.ma.array(fid.variables[var][:, :]).squeeze()
         elif ndim == 3:
             if time is None:
-                T = numpy.array(fid.variables[var][:, :, :]).squeeze()
+                T = numpy.ma.array(fid.variables[var][:, :, :]).squeeze()
             else:
-                T = numpy.array(fid.variables[var][time, :, :]).squeeze()
+                T = numpy.ma.array(fid.variables[var][time, :, :]).squeeze()
         elif ndim == 4:
             if time is None:
                 if depth is None:
-                    T = numpy.array(fid.variables[var][:, :, :, :]).squeeze()
+                    T = numpy.ma.array(fid.variables[var][:, :, :, :]).squeeze()
                 else:
-                    T = numpy.array(fid.variables[var][:, depth, :,
+                    T = numpy.ma.array(fid.variables[var][:, depth, :,
                                     :]).squeeze()
             elif depth is None:
-                T = numpy.array(fid.variables[var][time, :, :, :]).squeeze()
+                T = numpy.ma.array(fid.variables[var][time, :, :, :]).squeeze()
             else:
-                T = numpy.array(fid.variables[var][time, depth, :,
+                T = numpy.ma.array(fid.variables[var][time, depth, :,
                                 :]).squeeze()
     else:
         if ndim == 1:
-            T = numpy.array(fid.variables[var][index]).squeeze()
+            T = numpy.ma.array(fid.variables[var][index]).squeeze()
         elif ndim == 2:
-            T = numpy.array(fid.variables[var][index]).squeeze()
+            T = numpy.ma.array(fid.variables[var][index]).squeeze()
         elif ndim == 3:
             if time is None:
-                U = numpy.array(fid.variables[var][:, :, :]).squeeze()
+                U = numpy.ma.array(fid.variables[var][:, :, :]).squeeze()
                 T = U[:, index]
             else:
-                U = numpy.array(fid.variables[var][time, :, :]).squeeze()
+                U = numpy.ma.array(fid.variables[var][time, :, :]).squeeze()
                 T = U[index]
         elif ndim == 4:
             if time is None:
                 if depth is None:
-                    U = numpy.array(fid.variables[var][:, :, :, :]).squeeze()
+                    U = numpy.ma.array(fid.variables[var][:, :, :, :]).squeeze()
                     T = U[:, :, index]
                 else:
-                    U = numpy.array(fid.variables[var][:, depth, :,
+                    U = numpy.ma.array(fid.variables[var][:, depth, :,
                                     :]).squeeze()
                     T = U[:, index]
             elif depth is None:
-                U = numpy.array(fid.variables[var][time, :, :, :]).squeeze()
+                U = numpy.ma.array(fid.variables[var][time, :, :, :]).squeeze()
                 T = U[:, index]
             else:
-                U = numpy.array(fid.variables[var][time, depth, :,
+                U = numpy.ma.array(fid.variables[var][time, depth, :,
                                 :]).squeeze()
                 T = U[index]
 
@@ -148,7 +148,7 @@ def read_time(filename, ntime, itime=None):
 class velocity_netcdf():
     ''' read and write velocity data that is on a regular netcdf grid. '''
     def __init__(self, filename=None, lon='lon', lat='lat', time='time',
-                 varu='U', varv='V', var='H', missing_value=None):
+                 varu='U', varv='V', var='H', missing_value=None, box=None):
         self.file = filename
         self.nlon = lon
         self.nlat = lat
@@ -157,16 +157,40 @@ class velocity_netcdf():
         self.nvarv = varv
         self.nvar = var
         self.missing_value = missing_value
+        self.box = box
 
     def read_coord(self):
         '''Read data coordinates'''
-        self.lon, self.lat = read_coordinates(self.file,  self.nlon, self.nlat,
-                                              dd=False)
-        return None
+        self.lon0, self.lat0 = read_coordinates(self.file, self.nlon,
+                                                self.nlat, dd=False)
+        self.lon0 = numpy.mod(self.lon0 + 360, 360)
+        if self.box is not None:
+            box = self.box
+            if len(box) == 4:
+                indx = numpy.where((self.lon0[:] > box[0])
+                                   & (self.lon0[:] < box[1]))[0]
+                self.slice_x = slice(indx[0], indx[-1] + 1)
+                print(self.slice_x)
+                indy = numpy.where((self.lat0[:] > box[2])
+                                   & (self.lat0[:] < box[3]))[0]
+                self.slice_y = slice(indy[0], indy[-1] + 1)
+                print(self.slice_y)
+            else:
+                logger.error('provide a valid box [lllon, urlon, lllat, urlat]'
+                             )
+                sys.exit(1)
+
+        if self.box is not None:
+            self.lon0 = self.lon0[self.slice_x]
+            self.lat0 = self.lat0[self.slice_y]
+        self.lon, self.lat = (self.lon0[:], self.lat0[:])
+        return self.slice_x, self.slice_y
 
     def read_vel(self, index=None, time=0, missing_value=None,
                  size_filter=None):
         '''Read data velocity'''
+        self.slice_x = slice(360, 600)
+        self.slice_y = slice(440, 580)
         varu = read_var(self.file, self.nvaru, index=None, time=0,
                         depth=0, missing_value=missing_value)
         varv = read_var(self.file, self.nvarv, index=None, time=0,
@@ -174,14 +198,21 @@ class velocity_netcdf():
         if size_filter is not None:
             varu = filters.gaussian_filter(varu, sigma=size_filter)
             varv = filters.gaussian_filter(varv, sigma=size_filter)
+        if self.box is not None:
+            varu = varu[self.slice_y, self.slice_x]
+            varv = varv[self.slice_y, self.slice_x]
         self.varu = varu
         self.varv = varv
         return None
 
     def read_var(self, index=None, time=0, missing_value=None):
         '''Read data variable'''
-        self.var = read_var(self.file, self.nvar, index=None, time=0, depth=0,
+        self.slice_x = slice(360, 600)
+        self.slice_y = slice(440, 580)
+        var = read_var(self.file, self.nvar, index=None, time=0, depth=0,
                             missing_value=missing_value)
+        if self.box is not None:
+            self.var = var[self.slice_y, self.slice_x]
         return None
 
     def read_time(self, index=None, time=0):
