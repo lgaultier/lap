@@ -231,22 +231,10 @@ def convert(x, y, u, v):
     #     transpose = True
 
     # Keep longitude between -180, 180
-    x[x > 180] -= 360
-    x0 = x
-    y0 = y
-    # x0 = numpy.empty([nx, ny])
-    # y0 = numpy.empty([nx, ny])
-
-    # Build a matrix of latitude and longitude
-    # for ix in range(nx):
-    #     y0[ix, :] = y
-    # for ix in range(ny):
-    #     x0[:, ix] = x
-
-    # if transpose:
-    #     x0 = x0.transpose()
-    #     y0 = y0.transpose()
-
+    #x[numpy.where(x > 180)] -= 360
+    x0 = + x
+    y0 = + y
+    x0[numpy.where(x0 > 180)] -= 360
     # Conversion from spherical to cartesian coordinates and move it
     # for one second using U and V component
     lon = numpy.radians(x0)
@@ -258,17 +246,22 @@ def convert(x, y, u, v):
     xc = -u * sin_x - v * cos_x * sin_y
     yc = u * cos_x - v * sin_y * sin_x
     zc = v * cos_y
-    xc += const.Rearth * cos_y * cos_x
-    yc += const.Rearth * cos_y * sin_x
-    zc += const.Rearth * sin_y
+    xc =  xc + const.Rearth * cos_y * cos_x
+    yc = yc + const.Rearth * cos_y * sin_x
+    zc = zc + const.Rearth * sin_y
 
     # Conversion from cartesian to spherical coordinates
     x1 = numpy.degrees(numpy.arctan2(yc, xc))
     y1 = numpy.degrees(numpy.arcsin(
                        zc / numpy.sqrt(xc * xc + yc * yc + zc * zc)))
+    print(x1)
     dx = x1 - x0
     dy = y1 - y0
-
+    from matplotlib import pyplot
+    pyplot.figure(figsize=(10,10))
+    s = 3
+    pyplot.quiver(x0[::s, ::s], y0[::s, ::s], dx[::s, ::s], dy[::s, ::s])
+    pyplot.savefig('figtool.png')
     # Return the velocity in degrees/s
     return numpy.mod(dx + 180.,  360.) - 180., dy
 

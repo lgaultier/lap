@@ -355,15 +355,18 @@ def read_velocity(p, get_time=None):
         mask = (numpy.ma.getmaskarray(VEL.varu)
                 | numpy.ma.getmaskarray(VEL.varv)
                 | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv))
-        VEL.varu[mask] = 0
-        VEL.varv[mask] = 0
         # VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
         # VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
         try:
             VEL.var[numpy.where(abs(VEL.var) > 100)] = numpy.nan
         except:
             pass
-        utmp, vtmp = mod_tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
+        #utmp, vtmp = mod_tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
+        utmp = VEL.varu /(111.10**3 * numpy.cos(numpy.deg2rad(lat2du)))
+        vtmp = VEL.varv / 111.10**3
+        VEL.varu[mask] = 0
+        VEL.varv[mask] = 0
+
         # Compute Strain Relative Vorticity and Okubo Weiss
         if p.save_S or p.save_RV or p.save_OW:
             gfo = (9.81 / numpy.cos(numpy.mean((lat2du + lat2dv)/2)*pi/180.)
