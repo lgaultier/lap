@@ -199,8 +199,6 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     rlonv, rlatv, iv, jv, dVlonv, dVlatv = dist
     dlondt = mod_tools.lin_2Dinterp(VEL.ut, rlonu, rlatu)
     dlatdt = mod_tools.lin_2Dinterp(VEL.vt, rlonv, rlatv)
-    if dlondt == 0 or dlatdt == 0:
-        import pdb ; pdb.set_trace()
     # Set velocity to 0 if particle is outside domain
     if (rlonu < 0 or rlonu > 1 or rlatu < 0 or rlatu > 1
           or rlonv < 0 or rlonv > 1 or rlatv < 0 or rlatv > 1):

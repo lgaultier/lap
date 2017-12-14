@@ -362,10 +362,10 @@ def read_velocity(p, get_time=None):
         except:
             pass
         #utmp, vtmp = mod_tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
-        utmp = VEL.varu /(111.10**3 * numpy.cos(numpy.deg2rad(lat2du)))
-        vtmp = VEL.varv / 111.10**3
         VEL.varu[mask] = 0
         VEL.varv[mask] = 0
+        utmp = VEL.varu /(111.10**3 * numpy.cos(numpy.deg2rad(lat2du)))
+        vtmp = VEL.varv / 111.10**3
 
         # Compute Strain Relative Vorticity and Okubo Weiss
         if p.save_S or p.save_RV or p.save_OW:
