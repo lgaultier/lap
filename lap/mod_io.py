@@ -490,3 +490,10 @@ def write_advected_tracer(p, data_out):
     default_output = os.path.join(p.output_dir, file_default)
     p.output = getattr(p, 'output', default_output)
     write_utils.write_tracer_2d(p.output, data_out)
+
+
+def write_params(p, time):
+    outformat = '%Y%m%dT%H%M%S'
+    stime = time.strftime(outformat)
+    output = f'params_output_{stime}'
+    write_utils.write_params(p, output)

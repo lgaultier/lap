@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 # -------------------#
 # TO CHECK
 
+def write_params(params, pfile):
+    """ Write parameters that have been selected to run swot_simulator. """
+    with open(pfile, 'w') as f:
+        for key in dir(params):
+            if not key[0:2] == '__':
+                f.write('{} = {}\n'.format(key, params.__dict__[key]))
+
 
 def write_velocity(data, outfile, description='AVISO-like data',
                    unit=const.unit, long_name=const.long_name,
@@ -127,6 +134,9 @@ def write_listracer_1d(wfile, T, p, listTr):
     # - Open Netcdf file in write mode
     fid = netCDF4.Dataset(wfile, 'w')
     fid.description = "Drifter advected by lagrangian tool"
+    exportables = [k for k in dir(p) if not k.startswith('__')]
+    str_params = [f'{k}={getattr(p, k)}' for k in exportables]
+    fid.comment = ' '.join(str_params)
 
     # - Create dimensions
     dim_part = 'obs'

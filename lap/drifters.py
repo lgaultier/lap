@@ -91,4 +91,6 @@ def run_drifter(p):
 
     if rank == 0:
         mod_io.write_drifter(p, drifter, listTr)
-        logger.info(f'End time {datetime.datetime.now()}')
+        end_time = datetime.datetime.now()
+        logger.info(f'End time {end_time}')
+        mod_io.write_params(p, end_time)
