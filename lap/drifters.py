@@ -78,8 +78,8 @@ def run_drifter(p):
                                            grid, rank=rank, size=size)
     import numpy
     print(dim_hr)
-    dim_hr = numpy.shape(list_var_adv['lon_hr'])
-    dim_lr = numpy.shape(list_var_adv['lon_lr'])
+    dim_hr[0] = numpy.shape(list_var_adv['lon_hr'])[0]
+    dim_lr[0] = numpy.shape(list_var_adv['lon_lr'])[0]
     print(dim_hr)
     # - Save output in netcdf file
     if p.parallelisation is True:

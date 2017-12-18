@@ -39,13 +39,13 @@ def init_velocity(VEL, lonpa, latpa, su, sv):
     else:
         dVlonv = VEL.Vlonv[jv + 1] - VEL.Vlonv[jv]
     # index_vel = (iu, ju, iv, jv)
-    dvcoord = (dVlatu, dVlatv, dVlonu, dVlonv)
-    return (iu, ju), (iv, jv), dvcoord
+    dvcoord = [dVlatu, dVlatv, dVlonu, dVlonv]
+    return iu, ju, iv, jv, dvcoord
 
 
 def interpol_intime(arr, t, index_vel, interp_dt, su):
     '''Extract 4 neighbors and interpolate in time between two time steps'''
-    (iu, ju) = index_vel
+    iu, ju = index_vel
     result = numpy.zeros((2, 2))
     slice_t = slice(int(t), int(t+2))
     try:
@@ -75,8 +75,8 @@ def no_interpol_intime(arr, index_vel, su):
 
 def dist_topoints(lon, lat, lonpa, latpa, dvcoord, index, su):
     '''Interpolate linearly the velocity between two grid points'''
-    (iu, ju) = index
-    (dVlon, dVlat) = dvcoord
+    iu, ju = index
+    dVlon, dVlat = dvcoord
     rlon = (lonpa - lon[ju]) / (dVlon)
     rlat = (latpa - lat[iu]) / (dVlat)
     while rlat > 1. and iu < (su[0] - 1):
@@ -207,7 +207,7 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
         mask = 1
     rcoord = [rlonu, rlatu, rlonv, rlatv]
     vcoord = [iu, ju, iv, jv]
-    dvcoord= [dVlonu, dVlatu, dVlonv, dVlatv]
+    dvcoord = [dVlonu, dVlatu, dVlonv, dVlatv]
     # Propagate position of particle with velocity
     deltat = (p.adv_time_step * const.day2sec) # * p.tadvection
               #/ float(sizeadvection))
@@ -277,9 +277,9 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 r, rt = init_random_walk(sizeadvection, p.adv_time_step,
                                          p.scale)
             init = init_velocity(VEL, lonpa, latpa, su, sv)
-            (iu, ju), (iv, jv), dvcoord = init
-            (dVlatu, dVlatv, dVlonu, dVlonv) = dvcoord
-            vcoord = (iu, ju, iv, jv)
+            iu, ju, iv, jv, dvcoord = init
+            [dVlatu, dVlatv, dVlonu, dVlonv] = dvcoord
+            vcoord = [iu, ju, iv, jv]
             if p.save_S or p.save_OW:
                 Stmp = math.sqrt(VEL.Sn[0, iv, ju]**2 + VEL.Ss[0, iu, jv]**2)
             if p.save_RV or p.save_OW:
@@ -292,8 +292,10 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             mask = 0
             tstop = int(abs(p.tadvection) / p.output_step + 1)
             for t in numpy.arange(0, tstop, p.adv_time_step):
-                dt = t - t%p.vel_step
+                dt = t % p.vel_step
+                # Index for random walk
                 k = int(t)
+                # Index in velocity array, set to 0 if stationary
                 ind_t = + int(t)
                 if p.stationary:
                     ind_t = 0
@@ -372,10 +374,9 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                         vOW.append(OWtmp)
                     else:
                         vOW = 0
-                #dt += p.adv_time_step
                 #k += 1
                 # -- Store new longitude and new latitude at each output_step
-                if (t % p.output_step + dt > 1):
+                if (t % p.output_step + p.adv_time_step > 1):
                     lon_lr[int(t) + 1, pa - i0] = lonpa
                     lat_lr[int(t) + 1, pa - i0] = latpa
                     mask_lr[int(t) + 1, pa - i0] = mask

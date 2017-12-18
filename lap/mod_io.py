@@ -1,6 +1,7 @@
 import numpy
 import os
 import sys
+import pyproj
 import lap.utils.read_utils as read_utils
 import lap.utils.write_utils as write_utils
 import lap.mod_tools as mod_tools
@@ -262,7 +263,7 @@ def make_grid(p):
     shape_tra = numpy.shape(Tr.lon)
     masktmp = masktmp.reshape(shape_tra)
     # TODO create real mask
-
+    #masktmp = numpy.ones(shape_tra)
     Tr.mask = (masktmp > 0)
     return Tr
 
@@ -362,10 +363,20 @@ def read_velocity(p, get_time=None):
         except:
             pass
         #utmp, vtmp = mod_tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
+        geod = pyproj.Geod(ellps='WGS84')
+        azim = numpy.arctan2(VEL.varv, VEL.varu)
+        dist1s = numpy.sqrt(VEL.varu**2 + VEL.varv**2)
+        lonend, latend, _ = geod.fwd(lon2du, lat2du, numpy.rad2deg(azim),
+                                     dist1s, radians=False)
+        lonend = numpy.mod(lonend, 360)
+        utmp = lonend - lon2du
+        vtmp = latend - lat2du
         VEL.varu[mask] = 0
         VEL.varv[mask] = 0
-        utmp = VEL.varu /(111.10**3 * numpy.cos(numpy.deg2rad(lat2du)))
-        vtmp = VEL.varv / 111.10**3
+        utmp[mask] = 0
+        vtmp[mask] = 0
+        #utmp = VEL.varu /(111.10**3 * numpy.cos(numpy.deg2rad(lat2du)))
+        #vtmp = VEL.varv / 111.10**3
 
         # Compute Strain Relative Vorticity and Okubo Weiss
         if p.save_S or p.save_RV or p.save_OW:

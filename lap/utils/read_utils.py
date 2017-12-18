@@ -233,7 +233,8 @@ class velocity_netcdf():
             else:
                 self.slice_x = slice_xy[0]
                 self.slice_y = slice_xy[1]
-            self.var = var[self.slice_y, self.slice_x]
+            var = var[self.slice_y, self.slice_x]
+        self.var = var
         return None
 
     def read_time(self, index=None, time=0):

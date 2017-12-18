@@ -43,8 +43,8 @@ def init_empty_variables(p, grid, listTr, size, rank):
     # time step
     Timesize_hr = int(abs(p.tadvection + 1) / p.output_step / p.adv_time_step
                       + 1)
-    dim_hr = (Timesize_hr, Gridsize)
-    dim_lr = (Timesize_lr, Gridsize)
+    dim_hr = [Timesize_hr, Gridsize]
+    dim_lr = [Timesize_lr, Gridsize]
     # Initialise number of tracer in list
     nlist = 0
     if rank == 0:
