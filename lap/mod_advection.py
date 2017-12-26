@@ -52,8 +52,8 @@ def interpol_intime(arr, t, index_vel, interp_dt, su):
         result[0, 0] = mod_tools.lin_1Dinterp(arr[slice_t, iu, ju], interp_dt)
         result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju + 1,
                                                   su[1] - 1)], interp_dt)
-        result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
-                                              ju], interp_dt)
+        result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1,
+                                              su[0] - 1), ju], interp_dt)
         result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
                                               min(ju + 1, su[1] - 1)], interp_dt)
     except:
@@ -64,7 +64,7 @@ def interpol_intime(arr, t, index_vel, interp_dt, su):
 def no_interpol_intime(arr, index_vel, su):
     '''Extract 4 neighbors, no interpolation in time (used for
     stationary fields).'''
-    (iu, ju) = index_vel
+    iu, ju = index_vel
     result = numpy.zeros((2, 2))
     result[0, 0] = arr[0, iu, ju]
     result[0, 1] = arr[0, iu, min(ju + 1, su[1] - 1)]
@@ -179,17 +179,18 @@ def init_full_traj(p, s0, s1):
 
 def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
                           svel, sizeadvection):
+    # import pdb ; pdb.set_trace()
     dVlonu, dVlatu, dVlonv, dVlatv = dv
     iu, ju, iv, jv = vcoord
     su, sv = svel
     # Temporal interpolation  for velocity
     interp_dt = dt / p.vel_step
-    if p.stationary is False:
-        VEL.ut = interpol_intime(VEL.u, t, [iu, ju], interp_dt, su)
-        VEL.vt = interpol_intime(VEL.v, t, [iv, jv], interp_dt, sv)
-    else:
-        VEL.ut = no_interpol_intime(VEL.u, [iu, ju], su)
-        VEL.vt = no_interpol_intime(VEL.v, [iv, jv], sv)
+    # if p.stationary is False:
+    #    VEL.ut = interpol_intime(VEL.u, t, [iu, ju], interp_dt, su)
+    #    VEL.vt = interpol_intime(VEL.v, t, [iv, jv], interp_dt, sv)
+    # else:
+    #    VEL.ut = no_interpol_intime(VEL.u, [iu, ju], su)
+    #    VEL.vt = no_interpol_intime(VEL.v, [iv, jv], sv)
     # 2D Spatial interpolation for velocity
     dist = dist_topoints(VEL.Vlonu, VEL.Vlatu, lonpa, latpa,
                          [dVlonu, dVlatu], [iu, ju], su)
@@ -197,6 +198,12 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     dist = dist_topoints(VEL.Vlonv, VEL.Vlatv, lonpa, latpa,
                          [dVlonv, dVlatv], [iv, jv], sv)
     rlonv, rlatv, iv, jv, dVlonv, dVlatv = dist
+    if p.stationary is False:
+        VEL.ut = interpol_intime(VEL.u, t, [iu, ju], interp_dt, su)
+        VEL.vt = interpol_intime(VEL.v, t, [iv, jv], interp_dt, sv)
+    else:
+        VEL.ut = no_interpol_intime(VEL.u, [iu, ju], su)
+        VEL.vt = no_interpol_intime(VEL.v, [iv, jv], sv)
     dlondt = mod_tools.lin_2Dinterp(VEL.ut, rlonu, rlatu)
     dlatdt = mod_tools.lin_2Dinterp(VEL.vt, rlonv, rlatv)
     # Set velocity to 0 if particle is outside domain
@@ -213,6 +220,7 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
               #/ float(sizeadvection))
     transport = dlondt * deltat
     turbulence = p.B * rk + p.sigma * rk * deltat
+    # print(turbulence)
     lonpa = lonpa + transport + turbulence[0]
     transport = dlatdt * deltat
     latpa = latpa + transport + turbulence[1]
@@ -239,8 +247,10 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
     # # Loop on particles
     for pa in part:
         # # - Initialize final variables
-        lonpa = grid.lon1d[pa]
-        latpa = grid.lat1d[pa]
+        lonpa = + grid.lon1d[pa]
+        latpa = + grid.lat1d[pa]
+        lon_lr[0, pa - i0] = + lonpa
+        lat_lr[0, pa - i0] = + latpa
         if p.save_traj is True:
             vlonpa = [lonpa, ]
             vlatpa = [latpa, ]
@@ -252,8 +262,6 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             vOW = [0, ]
             vRV = [0, ]
             vmask = [1, ]
-        lon_lr[0, pa - i0] = lonpa
-        lat_lr[0, pa - i0] = latpa
         for Trac in listGr:
             Trac.newj0 = numpy.argmin(abs(Trac.lon - lonpa), axis=1)[0]
             Trac.newi0 = numpy.argmin(abs(Trac.lat - latpa), axis=0)[0]

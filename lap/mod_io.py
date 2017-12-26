@@ -364,17 +364,21 @@ def read_velocity(p, get_time=None):
             pass
         #utmp, vtmp = mod_tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
         geod = pyproj.Geod(ellps='WGS84')
-        azim = numpy.arctan2(VEL.varv, VEL.varu)
+        #  pyproj.Geod.fwd expects bearings to be clockwise angles from north
+        # (in degrees
+        azim = numpy.pi / 2. - numpy.arctan2(VEL.varv, VEL.varu)
         dist1s = numpy.sqrt(VEL.varu**2 + VEL.varv**2)
-        lonend, latend, _ = geod.fwd(lon2du, lat2du, numpy.rad2deg(azim),
+        lon180 = numpy.mod(lon2du + 180, 360) - 180
+        lonend, latend, _ = geod.fwd(lon180, lat2du, numpy.rad2deg(azim),
                                      dist1s, radians=False)
-        lonend = numpy.mod(lonend, 360)
-        utmp = lonend - lon2du
+        # lonend = numpy.mod(lonend, 360)
+        utmp = lonend - lon180
         vtmp = latend - lat2du
         VEL.varu[mask] = 0
         VEL.varv[mask] = 0
         utmp[mask] = 0
         vtmp[mask] = 0
+
         #utmp = VEL.varu /(111.10**3 * numpy.cos(numpy.deg2rad(lat2du)))
         #vtmp = VEL.varv / 111.10**3
 
@@ -395,21 +399,21 @@ def read_velocity(p, get_time=None):
         if p.save_S or p.save_OW:
             Sn[t, 1: -1, 1: -1] = gfo*(dyutmp / dylonu - dxvtmp / dxlatv)
             Ss[t, 1: -1, 1: -1] = gfo*(dxutmp / dxlatu + dyvtmp / dylonv)
-        u[t, :, :] = utmp
-        v[t, :, :] = vtmp
-        usave[t, :, :] = VEL.varu
-        vsave[t, :, :] = VEL.varv
+        u[t, :, :] = + utmp
+        v[t, :, :] = + vtmp
+        usave[t, :, :] = + VEL.varu
+        vsave[t, :, :] = + VEL.varv
         try:
-            h[t, :, :] = VEL.var
+            h[t, :, :] = + VEL.var
         except:
             pass
     step = numpy.sign(p.tadvection) * p.vel_step
     stop = p.first_day + num_steps * numpy.sign(p.tadvection)
     VEL.time = numpy.arange(p.first_day, stop, step)
-    VEL.u = u
-    VEL.v = v
-    VEL.us = usave
-    VEL.vs = vsave
+    VEL.u = + u
+    VEL.v = + v
+    VEL.us = + usave
+    VEL.vs = + vsave
     VEL.h = h
     if p.save_S or p.save_OW:
         VEL.Ss = filters.gaussian_filter(Ss, 4)

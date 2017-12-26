@@ -32,10 +32,12 @@ def compute_eulerian_diags(p):
 
     # - Write all data:
     logger.info('Writing Velocities')
-    for t in range(len(p.list_vel) - 1):
+    ntime = numpy.shape(VEL.us)[0]
+    for t in range(ntime):
         jj = int(VEL.time[t])
         file_default = f'eulerian_{jj:06d}.nc'
         default_output = os.path.join(p.output_dir, file_default)
-        p.output = getattr(p, 'output', default_output)
+        p.output = default_output
+        # getattr(p, 'output', default_output)
         write_utils.write_aviso(p.output, VEL, t)
     logger.info(f'End time {datetime.datetime.now()}')
