@@ -121,6 +121,7 @@ def read_var(filename, var, index=None, time=0, depth=0, missing_value=None):
     # - Mask value that are NaN
     if missing_value is not None:
         T[numpy.where(T == missing_value)] = numpy.nan
+    T._sharedmask = False
     return T
 
 
@@ -215,6 +216,8 @@ class velocity_netcdf():
             self.slice_y = None
         self.varu = varu
         self.varv = varv
+        self.varu._sharedmask = False
+        self.varv._sharedmask = False
         return None
 
     def read_var(self, index=None, time=0, missing_value=None,

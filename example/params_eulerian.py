@@ -151,15 +151,13 @@ save_U = True
 save_V = True
 # Save diagnostic parameters
 save_S = True
-save_RV = False
-save_OW = False
+save_RV = True
+save_OW = True
 # Set output file name and path
 output_dir = './'
-test = 'aviso'
-if stationary is True:
-    test = 'aviso_stat'
+test = 'ow'
 start = int(first_day)
 stop = int(first_day + tadvection)
-output_file = f'{test}_advection_{start}_{stop}.nc'
+output_file = f'{test}_{start}_{stop}.nc'
 output = os.path.join(output_dir, output_file)
 

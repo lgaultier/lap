@@ -77,7 +77,7 @@ stationary = True
 
 # -- FSLE -- ##
 # Specify diagnostic, choices are 'FSLE', 'FTLE'
-diagnostic = 'FSLE'
+diagnostic = 'FTLE'
 # Initial distance between particles
 delta0 = 0.04
 # Final distance between particles

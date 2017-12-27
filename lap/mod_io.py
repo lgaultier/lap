@@ -414,7 +414,7 @@ def read_velocity(p, get_time=None):
     VEL.v = + v
     VEL.us = + usave
     VEL.vs = + vsave
-    VEL.h = h
+    VEL.h = + h
     if p.save_S or p.save_OW:
         VEL.Ss = filters.gaussian_filter(Ss, 4)
         VEL.Sn = filters.gaussian_filter(Sn, 4)
