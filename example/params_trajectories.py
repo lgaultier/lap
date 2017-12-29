@@ -154,7 +154,7 @@ save_S = True
 save_RV = False
 save_OW = False
 # Set output file name and path
-output_dir = './'
+output_dir = '/mnt/data/project/dimup'
 test = 'aviso'
 if stationary is True:
     test = 'aviso_stat'

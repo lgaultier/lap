@@ -52,6 +52,7 @@ optional_dependencies = {'plot': ['matplotlib', ], 'carto': ['matplotlib',
 cmds = [f'drifter = {__package_name__}.cli:run_drifters_script',
         f'eulerian = {__package_name__}.cli:run_eulerian_diags_script',
         f'lyapunov = {__package_name__}.cli:run_lyapunov_script',
+        f'lagrangian = {__package_name__}.cli:run_lagrangian_script',
         ]
 
 setup(name='lap',

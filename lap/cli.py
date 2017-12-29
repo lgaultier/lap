@@ -56,3 +56,19 @@ def run_lyapunov_script() ->None:
 
     p = mod_tools.load_python_file(file_param)
     lyapunov.lyapunov(p)
+
+def run_lagrangian_script() ->None:
+    ''' Compute Lagrangian diagnostics. '''
+    import lap.lag_diag as lag_diag
+    handler.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+    if len(sys.argv) < 2:
+        logger.error('Please specify a parameter file')
+        sys.exit(1)
+    else:
+        file_param = str(sys.argv[1])
+
+    p = mod_tools.load_python_file(file_param)
+    lag_diag.lagrangian_diag(p)

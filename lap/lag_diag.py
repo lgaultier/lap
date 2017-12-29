@@ -31,24 +31,27 @@ def compute_lavd(plon, plat, ptime, pvort, mean_vort, t0=0):
     tini = t0 + 1
     for t in range(ntime - t0):
         tf = t + t0 + 2
-        lavd_tmp = numpy.sum(numpy.abs(pvort[tini: tf, :]
-                             - mean_vort[tini: tf, numpy.newaxis]), axis=0)
-        lavd_t0 = numpy.abs(pvort[tinipvort[t0, :] - mean_vort[t0]) / 2
-        lavd_t = numpy.abs(pvort[tinipvort[tf + 1, :] - mean_vort[tf + 1]) / 2
+        index_f = floor(tf * p.adv_time_step)
+        index_i = floor(t0 * p.adv_time_step)
+        lavd_tmp = numpy.sum(numpy.abs(pvort[t0 + 1: tf, :]
+                             - mean_vort[index_i: index_f, numpy.newaxis]),
+                             axis=0)
+        lavd_t0 = numpy.abs(pvort[pvort[t0, :] - mean_vort[index_i]) / 2
+        lavd_t = numpy.abs(pvort[tinipvort[tf, :] - mean_vort[index_f]) / 2
         lavd_tmp = lavd_tmp + lavd_t0 + lavd_t
-        lavd_time[t] = ptime[tf + 1] - ptime[t0]
+        lavd_time[t] = ptime[tf] - ptime[t0]
         lavd[t, :] = lavd_tmp
     return lavd, lavd_time
 
 
-def lagragian_diag(p):
+def lagrangian_diag(p):
     logger.info(f'Start time {datetime.datetime.now()}')
     list_var = ['lon_hr', 'lat_hr', 'time_hr', 'u_hr', 'Vorticity']
     dict_var = read_utils.read_trajectory(p.output, list_var)
     lon = dict_var['lon_hr']
     lat = dict_var['lat_hr']
     vort = dict_var['Vorticity']
-    time_part = dict_var['time_hr']
+    ptime = dict_var['time_hr']
     num_t, num_pa = numpy.shape(lon)
     if p.make_grid is False:
         grid = mod_io.read_grid_netcdf(p)
@@ -77,7 +80,10 @@ def lagragian_diag(p):
     else:
         mezic_2D = None
 
-    if 'LAVD' in p.diagnostic
+    if 'LAVD' in p.diagnostic:
+        p.save_RV = True
+        VEL = mod_io.read_velocity(p)
+        mean_vort = numpy.mean(numpy.mean(VEL.RV, axis=2), axis=1)
         lavd, lavd_t = compute_lavd(lon, lat, ptime, pvort, mean_vort)
         lavd_2D = numpy.zeros((numpy.shape(lavd)[0], grid_shape[0],
                                grid_shape[1]))
