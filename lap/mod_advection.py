@@ -57,7 +57,7 @@ def interpol_intime(arr, t, index_vel, interp_dt, su):
         result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
                                               min(ju + 1, su[1] - 1)], interp_dt)
     except:
-        import pdb ; pdb.set_trace()
+        logger.error('issue on 1D interpolation')
     return result
 
 
@@ -179,7 +179,6 @@ def init_full_traj(p, s0, s1):
 
 def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
                           svel, sizeadvection):
-    # import pdb ; pdb.set_trace()
     dVlonu, dVlatu, dVlonv, dVlatv = dv
     iu, ju, iv, jv = vcoord
     su, sv = svel
@@ -334,7 +333,8 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                     try:
                         ums = mod_tools.lin_2Dinterp(VEL.us[ind_t, slice_iu,
                                                  slice_ju], rlonu, rlatu)
-                    except: import pdb ; pdb.set_trace()
+                    except:
+                        logger.error('issue on lin_2D interp')
                 if p.save_V is True:
                     vms = mod_tools.lin_2Dinterp(VEL.vs[ind_t, slice_iv,
                                                  slice_jv], rlonv, rlatv)

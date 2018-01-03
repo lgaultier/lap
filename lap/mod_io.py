@@ -228,9 +228,9 @@ def make_mask(p):
                                          lat=p.name_lat, box=p.box)
 
     elif p.vel_format == 'nemo':
-        VEL = read_utils.nemo_netcdf(filename=filename, varu=p.name_u,
-                                     varv=p.name_v, lon=p.name_lon,
-                                     lat=p.name_lat, box=p.box)
+        VEL = read_utils.nemo(filename=filename, varu=p.name_u,
+                              varv=p.name_v, lon=p.name_lon,
+                              lat=p.name_lat, box=p.box)
 
     VEL.read_coord()
     VEL.read_vel()
@@ -282,9 +282,9 @@ def read_velocity(p, get_time=None):
                                          varv=p.name_v, lon=p.name_lon,
                                          lat=p.name_lat, box=p.box)
     elif p.vel_format == 'nemo':
-        VEL = read_utils.nemo_netcdf(filename=filename, varu=p.name_u,
-                                     varv=p.name_v, lon=p.name_lon,
-                                     lat=p.name_lat, box=p.box)
+        VEL = read_utils.nemo(filename=filename, varu=p.name_u,
+                              varv=p.name_v, lon=p.name_lon,
+                              lat=p.name_lat, box=p.box)
     else:
         logger.error(f'{p.vel_format} format is not handled')
         sys.exit(1)
@@ -324,7 +324,7 @@ def read_velocity(p, get_time=None):
                                              lat=p.name_lat, var=p.name_h,
                                              box=p.box)
         elif p.vel_format == 'nemo':
-            VEL = read_utils.nemo_netcdf(filename=filename, varu=p.name_u,
+            VEL = read_utils.nemo(filename=filename, varu=p.name_u,
                                          varv=p.name_v, lon=p.name_lon,
                                          lat=p.name_lat, var=p.name_h,
                                          box=p.box)
@@ -338,10 +338,8 @@ def read_velocity(p, get_time=None):
         else:
             VEL.read_vel(size_filter=p.vel_filter, slice_xy=(slice_x, slice_y))
         # TODO: to change
-        try:
+        if p.name_h is not None:
             VEL.read_var(size_filter=p.vel_filter)
-        except:
-            pass
         if t == num_steps - 1:
             VEL.read_coord()
             VEL.Vlonu = numpy.mod(VEL.lon[:] + 360., 360.)
@@ -358,10 +356,8 @@ def read_velocity(p, get_time=None):
                 | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv))
         # VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
         # VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
-        try:
+        if p.name_h is not None:
             VEL.var[numpy.where(abs(VEL.var) > 100)] = numpy.nan
-        except:
-            pass
         #utmp, vtmp = mod_tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
         geod = pyproj.Geod(ellps='WGS84')
         #  pyproj.Geod.fwd expects bearings to be clockwise angles from north
@@ -403,10 +399,8 @@ def read_velocity(p, get_time=None):
         v[t, :, :] = + vtmp
         usave[t, :, :] = + VEL.varu
         vsave[t, :, :] = + VEL.varv
-        try:
+        if p.name_h is not None:
             h[t, :, :] = + VEL.var
-        except:
-            pass
     step = numpy.sign(p.tadvection) * p.vel_step
     stop = p.first_day + num_steps * numpy.sign(p.tadvection)
     VEL.time = numpy.arange(p.first_day, stop, step)

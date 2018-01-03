@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # -------------------#
 
 
-def read_coordinates(filename, nlon, nlat, dd=True):
+def read_coordinates(filename, nlon, nlat, dd=True, subsample=1):
     ''' General routine to read coordinates in a netcdf file. \n
     Inputs are file name, longitude name, latitude name. \n
     Outputs are longitudes and latitudes (2D arrays).'''
@@ -31,6 +31,8 @@ def read_coordinates(filename, nlon, nlat, dd=True):
     if len(vartmp.shape) == 1:
         lon_tmp = numpy.array(fid.variables[nlon][:]).squeeze()
         lat_tmp = numpy.array(fid.variables[nlat][:]).squeeze()
+        lon_tmp = lon_tmp[::subsample]
+        lat_tmp = lat_tmp[::subsample]
         if dd is True:
             lon, lat = numpy.meshgrid(lon_tmp, lat_tmp)
         else:
@@ -39,6 +41,8 @@ def read_coordinates(filename, nlon, nlat, dd=True):
     elif len(vartmp.shape) == 2:
         lon = numpy.array(fid.variables[nlon][:, :]).squeeze()
         lat = numpy.array(fid.variables[nlat][:, :]).squeeze()
+        lon = lon[::subsample, ::subsample]
+        lat = lat[::subsample, ::subsample]
     else:
         logger.error('unknown dimension for lon and lat')
         sys.exit(1)
@@ -46,7 +50,7 @@ def read_coordinates(filename, nlon, nlat, dd=True):
     return lon, lat
 
 
-def read_var(filename, var, index=None, time=0, depth=0, missing_value=None):
+def read_var(filename, var, index=None, time=0, depth=0, subsample=1, missing_value=None):
     ''' General routine to read variables in a netcdf file. \n
     Inputs are file name, variable name, index=index to read part
     of the variables, time=time to read a specific time, depth=depth to read a
@@ -90,8 +94,10 @@ def read_var(filename, var, index=None, time=0, depth=0, missing_value=None):
     else:
         if ndim == 1:
             T = numpy.ma.array(fid.variables[var][index]).squeeze()
+            T = T[::subsample]
         elif ndim == 2:
             T = numpy.ma.array(fid.variables[var][index]).squeeze()
+            T = T[::subsample, ::subsample]
         elif ndim == 3:
             if time is None:
                 U = numpy.ma.array(fid.variables[var][:, :, :]).squeeze()
@@ -99,6 +105,7 @@ def read_var(filename, var, index=None, time=0, depth=0, missing_value=None):
             else:
                 U = numpy.ma.array(fid.variables[var][time, :, :]).squeeze()
                 T = U[index]
+            T = T[::subsample, ::subsample]
         elif ndim == 4:
             if time is None:
                 if depth is None:
@@ -115,6 +122,7 @@ def read_var(filename, var, index=None, time=0, depth=0, missing_value=None):
                 U = numpy.ma.array(fid.variables[var][time, depth, :,
                                 :]).squeeze()
                 T = U[index]
+            T = T[::subsample, ::subsample]
 
     fid.close()
 
@@ -221,7 +229,7 @@ class velocity_netcdf():
         return None
 
     def read_var(self, index=None, time=0, missing_value=None,
-                 slice_xy=None):
+                 slice_xy=None, size_filter=None):
         '''Read data variable'''
         if slice_xy is None:
             self.slice_x, self.slice_y = self.read_coord()
@@ -264,7 +272,8 @@ class nemo():
     def read_coord(self):
         '''Read data coordinates'''
         self.lon0, self.lat0 = read_coordinates(self.file,  self.nlon,
-                                                self.nlat, dd=False)
+                                                self.nlat, dd=False, subsample=5)
+        #self.lon0 = numpy.mod(self.lon0 + 360, 360)
         if self.box is not None:
             box = self.box
             if len(box) == 4:
@@ -278,29 +287,44 @@ class nemo():
                 logger.error('provide a valid box [lllon, urlon, lllat, urlat]'
                              )
                 sys.exit(1)
+        else:
+            self.slice_x = None
+            self.slice_y = None
 
-        self.lon2d, self.lat2d = numpy.meshgrid(self.lon0[0, :],
-                                                self.lat0[:, 0])
-        self.lon, self.lat = (self.lon0[0, :], self.lat0[:, 0])
         if box is not None:
             self.lon0 = self.lon0[self.slice_y, self.slice_x]
             self.lat0 = self.lat0[self.slice_y, self.slice_x]
+        self.lon2d, self.lat2d = numpy.meshgrid(self.lon0[0, :],
+                                                self.lat0[:, 0])
+        self.lon, self.lat = (self.lon0[0, :], self.lat0[:, 0])
         return None
 
     def read_vel(self, index=None, time=0, missing_value=None,
-                 size_filter=None):
+                 size_filter=None, slice_xy=None):
         '''Read data velocity'''
+        #if slice_xy is None:
         self.read_coord()
+        #else:
+        #    self.slice_x = slice_xy[0]
+        #    self.slice_y = slice_xy[1]
         varu = read_var(self.file, self.nvaru, index=index, time=0, depth=0,
-                        missing_value=missing_value)
+                        missing_value=missing_value, subsample=5)
         varv = read_var(self.file, self.nvarv, index=index, time=0, depth=0,
-                        missing_value=missing_value)
+                        missing_value=missing_value, subsample=5)
         if size_filter is not None:
             varu = filters.gaussian_filter(varu, sigma=size_filter)
             varv = filters.gaussian_filter(varv, sigma=size_filter)
         if self.box is not None:
+            #if slice_xy is None:
+            #    self.read_coord()
+            #else:
+            #    self.slice_x = slice_xy[0]
+            #    self.slice_y = slice_xy[1]
             varu = varu[self.slice_y, self.slice_x]
             varv = varv[self.slice_y, self.slice_x]
+        else:
+            self.slice_x = None
+            self.slice_y = None
         self.varu = griddata((self.lon0.ravel(), self.lat0.ravel()),
                              varu.ravel(),
                              (self.lon2d, self.lat2d), method='linear')
@@ -308,13 +332,15 @@ class nemo():
                              varv.ravel(),
                              (self.lon2d, self.lat2d), method='linear')
         # # TODO: Implement more efficient gridding method
+        self.varu[numpy.isnan(self.varu)] = 0
+        self.varv[numpy.isnan(self.varv)] = 0
         return None
 
     def read_var(self, index=None, time=0, missing_value=None,
                  size_filter=None):
         '''Read data variable'''
         var = read_var(self.file, self.nvar, index=index, time=0, depth=0,
-                       missing_value=missing_value)
+                       missing_value=missing_value, subsample=5)
         if size_filter is not None:
             var = filters.gaussian_filter(var, sigma=size_filter)
         if self.box is not None:

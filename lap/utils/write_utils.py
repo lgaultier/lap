@@ -40,6 +40,7 @@ def write_velocity(data, outfile, description='AVISO-like data',
     ndim_lon = 'lon'
     ndim_lat = 'lat'
     ndim_time = 'time'
+    ndim_time1 = 'time1'
     dim_lon = len(numpy.shape(lon))
     fid.createDimension(ndim_lat, numpy.shape(lat)[0])
     if dim_lon == 1:
@@ -51,6 +52,7 @@ def write_velocity(data, outfile, description='AVISO-like data',
                      'should be one or two')
         sys.exit(1)
     fid.createDimension(ndim_time, None)
+    fid.createDimension(ndim_time1, 1)
 
     # - Create and write Variables
     if dim_lon == 1:
@@ -75,7 +77,7 @@ def write_velocity(data, outfile, description='AVISO-like data',
                                          fill_value=fill_value)
                 var[:] = value
             if dim_value == 2:
-                var = fid.createVariable(str(key), 'f4', (ndim_time, ndim_lat,
+                var = fid.createVariable(str(key), 'f4', (ndim_time1, ndim_lat,
                                          ndim_lon), fill_value=fill_value)
                 var[0, :, :] = value
             elif dim_value == 3:

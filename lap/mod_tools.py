@@ -44,17 +44,18 @@ def make_default(p):
         p.name_lat = getattr(p, 'name_lat', 'lat')
         p.name_u = getattr(p, 'name_u', 'u')
         p.name_v = getattr(p, 'name_v', 'v')
-        p.name_h = getattr(p, 'name_h', 'h')
+        # p.name_h = getattr(p, 'name_h', 'h')
     elif p.vel_format == 'nemo':
         p.name_lon = getattr(p, 'name_lon', 'nav_lon')
         p.name_lat = getattr(p, 'name_lat', 'nav_lat')
         p.name_u = getattr(p, 'name_u', 'vozocrtx')
         p.name_v = getattr(p, 'name_v', 'vomecrty')
-        p.name_h = getattr(p, 'name_h', 'sossheig')
+        # p.name_h = getattr(p, 'name_h', 'sossheig')
     p.vel_filter = getattr(p, 'vel_filter', None)
     p.vel_step = getattr(p, 'vel_step', 1.0)
     p.output_step = getattr(p, 'output_step', 1.0)
     p.stationary = getattr(p, 'stationary', True)
+    p.name_h = getattr(p, 'name_h', None)
 
     # Advection parameters
     p.K = getattr(p, 'K', 0.)
@@ -254,7 +255,6 @@ def convert(x, y, u, v):
     x1 = numpy.degrees(numpy.arctan2(yc, xc))
     y1 = numpy.degrees(numpy.arcsin(
                        zc / numpy.sqrt(xc * xc + yc * yc + zc * zc)))
-    print(x1)
     dx = x1 - x0
     dy = y1 - y0
     from matplotlib import pyplot
