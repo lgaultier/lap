@@ -1,3 +1,10 @@
+# author Lucile Gaultier
+# python ~/src/lap_toolbox/example/plot/plot_trajectory.py
+#        /mnt/data/project/dimup/natl60_inst_advection_21215_21265.nc
+#        /mnt/data/project/dimup --box 290 325 34 55 --subsampling 11
+
+
+
 import os
 import numpy
 import logging
@@ -94,7 +101,8 @@ if '__main__' == __name__:
     # Plot variables
     basename = os.path.splitext(os.path.basename(infile))[0]
     output = os.path.join(output_path, f'{basename}.png')
-    plot_trajectory(dict_var['lon_hr'], dict_var['lat_hr'],
+    lon = numpy.mod(dict_var['lon_hr'] + 360, 360)
+    plot_trajectory(lon, dict_var['lat_hr'],
                     dict_var[list_var[0]], output, box=box,
                     subsampling=args.subsampling)
 
