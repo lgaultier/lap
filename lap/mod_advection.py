@@ -47,7 +47,7 @@ def interpol_intime(arr, t, index_vel, interp_dt, su):
     '''Extract 4 neighbors and interpolate in time between two time steps'''
     iu, ju = index_vel
     result = numpy.zeros((2, 2))
-    slice_t = slice(int(t), int(t+2))
+    slice_t = slice(int(t), int(t + 2))
     try:
         result[0, 0] = mod_tools.lin_1Dinterp(arr[slice_t, iu, ju], interp_dt)
         result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju + 1,
@@ -57,7 +57,7 @@ def interpol_intime(arr, t, index_vel, interp_dt, su):
         result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
                                               min(ju + 1, su[1] - 1)], interp_dt)
     except:
-        logger.error('issue on 1D interpolation')
+        logger.error('issue on interpolation in time')
     return result
 
 
@@ -198,8 +198,8 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
                          [dVlonv, dVlatv], [iv, jv], sv)
     rlonv, rlatv, iv, jv, dVlonv, dVlatv = dist
     if p.stationary is False:
-        VEL.ut = interpol_intime(VEL.u, t, [iu, ju], interp_dt, su)
-        VEL.vt = interpol_intime(VEL.v, t, [iv, jv], interp_dt, sv)
+        VEL.ut = interpol_intime(VEL.u, t / p.vel_step, [iu, ju], interp_dt, su)
+        VEL.vt = interpol_intime(VEL.v, t / p.vel_step, [iv, jv], interp_dt, sv)
     else:
         VEL.ut = no_interpol_intime(VEL.u, [iu, ju], su)
         VEL.vt = no_interpol_intime(VEL.v, [iv, jv], sv)
@@ -303,7 +303,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 # Index for random walk
                 k = int(t)
                 # Index in velocity array, set to 0 if stationary
-                ind_t = + int(t)
+                ind_t = + int(t / p.vel_step)
                 if p.stationary:
                     ind_t = 0
                 #while dt < p.output_step:
@@ -317,18 +317,22 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 iu, ju, iv, jv = vcoord
                 # 2D interpolation of physical variable
                 # TODO handle enpty or 0d slice
-                slice_iu = slice(iu, min(iu + 2, su[0] - 1))
-                #if len(slice_iu) < 2:
-                #    slice_iu = slice(su[0] - 2, su[0])
-                slice_iv = slice(iv, min(iv + 2, sv[0] - 1))
-                #if len(slice_iv) < 2:
-                #    slice_iv = slice(sv[0] - 2, sv[0])
-                slice_ju = slice(ju, min(ju + 2, su[1] - 1))
-                #if len(slice_ju) < 2:
-                #    slice_ju = slice(su[1] - 2, su[1])
-                slice_jv = slice(jv, min(jv + 2, sv[1] - 1))
-                #if len(slice_jv) < 2:
-                #    slice_jv = slice(sv[1] - 2, sv[1])
+                if iu < su[0] - 1:
+                    slice_iu = slice(iu, min(iu + 2, su[0]))
+                else:
+                    slice_iu = slice(su[0] - 2, su[0])
+                if iv < sv[0] - 1:
+                    slice_iv = slice(iv, min(iv + 2, sv[0]))
+                else:
+                    slice_iv = slice(sv[0] - 2, sv[0])
+                if ju < su[1] - 1:
+                    slice_ju = slice(ju, min(ju + 2, su[1]))
+                else:
+                    slice_ju = slice(su[1] - 2, su[1])
+                if jv < sv[1] - 1:
+                    slice_jv = slice(jv, min(jv + 2, sv[1]))
+                else:
+                    slice_jv = slice(sv[1] - 2, sv[1])
                 if p.save_U is True:
                     try:
                         ums = mod_tools.lin_2Dinterp(VEL.us[ind_t, slice_iu,

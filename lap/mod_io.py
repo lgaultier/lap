@@ -230,7 +230,7 @@ def make_mask(p):
     elif p.vel_format == 'nemo':
         VEL = read_utils.nemo(filename=filename, varu=p.name_u,
                               varv=p.name_v, lon=p.name_lon,
-                              lat=p.name_lat, box=p.box)
+                              lat=p.name_lat, box=p.box, subsample=p.subsample)
 
     VEL.read_coord()
     VEL.read_vel()
@@ -284,7 +284,7 @@ def read_velocity(p, get_time=None):
     elif p.vel_format == 'nemo':
         VEL = read_utils.nemo(filename=filename, varu=p.name_u,
                               varv=p.name_v, lon=p.name_lon,
-                              lat=p.name_lat, box=p.box)
+                              lat=p.name_lat, box=p.box, subsample=p.subsample)
     else:
         logger.error(f'{p.vel_format} format is not handled')
         sys.exit(1)
@@ -314,6 +314,9 @@ def read_velocity(p, get_time=None):
     Ss = numpy.zeros(shape_vel_u)
     RV = numpy.zeros(shape_vel_u)
     for t in range(0, num_steps):
+        if num_steps !=1:
+            perc = float(t / (num_steps - 1))
+            mod_tools.update_progress(perc, '', '')
         filename = os.path.join(p.vel_input_dir, p.list_vel[t])
         if not os.path.isfile(filename):
             logger.error(f'File {filename} not found')
@@ -325,9 +328,9 @@ def read_velocity(p, get_time=None):
                                              box=p.box)
         elif p.vel_format == 'nemo':
             VEL = read_utils.nemo(filename=filename, varu=p.name_u,
-                                         varv=p.name_v, lon=p.name_lon,
-                                         lat=p.name_lat, var=p.name_h,
-                                         box=p.box)
+                                  varv=p.name_v, lon=p.name_lon,
+                                  lat=p.name_lat, var=p.name_h,
+                                  box=p.box, subsample=p.subsample)
         else:
             logger.error('Undefined Velocity file type')
             sys.exit(1)

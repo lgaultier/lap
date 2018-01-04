@@ -50,7 +50,8 @@ def read_coordinates(filename, nlon, nlat, dd=True, subsample=1):
     return lon, lat
 
 
-def read_var(filename, var, index=None, time=0, depth=0, subsample=1, missing_value=None):
+def read_var(filename, var, index=None, time=0, depth=0, subsample=1,
+             missing_value=None):
     ''' General routine to read variables in a netcdf file. \n
     Inputs are file name, variable name, index=index to read part
     of the variables, time=time to read a specific time, depth=depth to read a
@@ -72,13 +73,16 @@ def read_var(filename, var, index=None, time=0, depth=0, subsample=1, missing_va
     if index is None:
         if ndim == 1:
             T = numpy.ma.array(fid.variables[var][:]).squeeze()
+            T = T[::subsample]
         elif ndim == 2:
             T = numpy.ma.array(fid.variables[var][:, :]).squeeze()
+            T = T[::subsample, ::subsample]
         elif ndim == 3:
             if time is None:
                 T = numpy.ma.array(fid.variables[var][:, :, :]).squeeze()
             else:
                 T = numpy.ma.array(fid.variables[var][time, :, :]).squeeze()
+            T = T[::subsample, ::subsample]
         elif ndim == 4:
             if time is None:
                 if depth is None:
@@ -91,6 +95,7 @@ def read_var(filename, var, index=None, time=0, depth=0, subsample=1, missing_va
             else:
                 T = numpy.ma.array(fid.variables[var][time, depth, :,
                                 :]).squeeze()
+            T = T[::subsample, ::subsample]
     else:
         if ndim == 1:
             T = numpy.ma.array(fid.variables[var][index]).squeeze()
@@ -259,7 +264,7 @@ class nemo():
     are in netcdf.'''
     def __init__(self, filename=None, lon='nav_lon', lat='nav_lat',
                  time='time', varu='vozocrtx', varv='vomecrty',
-                 var='sossheig', box=None):
+                 var='sossheig', box=None, subsample=1):
         self.file = filename
         self.nlon = lon
         self.nlat = lat
@@ -268,12 +273,14 @@ class nemo():
         self.nvarv = varv
         self.nvar = var
         self.box = box
+        self.ss = subsample
 
     def read_coord(self):
         '''Read data coordinates'''
         self.lon0, self.lat0 = read_coordinates(self.file,  self.nlon,
-                                                self.nlat, dd=False, subsample=5)
-        #self.lon0 = numpy.mod(self.lon0 + 360, 360)
+                                                self.nlat, dd=False,
+                                                subsample=self.ss)
+        self.lon0 = numpy.mod(self.lon0 + 360, 360)
         if self.box is not None:
             box = self.box
             if len(box) == 4:
@@ -308,9 +315,9 @@ class nemo():
         #    self.slice_x = slice_xy[0]
         #    self.slice_y = slice_xy[1]
         varu = read_var(self.file, self.nvaru, index=index, time=0, depth=0,
-                        missing_value=missing_value, subsample=5)
+                        missing_value=missing_value, subsample=self.ss)
         varv = read_var(self.file, self.nvarv, index=index, time=0, depth=0,
-                        missing_value=missing_value, subsample=5)
+                        missing_value=missing_value, subsample=self.ss)
         if size_filter is not None:
             varu = filters.gaussian_filter(varu, sigma=size_filter)
             varv = filters.gaussian_filter(varv, sigma=size_filter)
@@ -340,7 +347,7 @@ class nemo():
                  size_filter=None):
         '''Read data variable'''
         var = read_var(self.file, self.nvar, index=index, time=0, depth=0,
-                       missing_value=missing_value, subsample=5)
+                       missing_value=missing_value, subsample=self.ss)
         if size_filter is not None:
             var = filters.gaussian_filter(var, sigma=size_filter)
         if self.box is not None:

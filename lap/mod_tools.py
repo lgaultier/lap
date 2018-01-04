@@ -56,6 +56,7 @@ def make_default(p):
     p.output_step = getattr(p, 'output_step', 1.0)
     p.stationary = getattr(p, 'stationary', True)
     p.name_h = getattr(p, 'name_h', None)
+    p.subsample = getattr(p, 'subsample', 1)
 
     # Advection parameters
     p.K = getattr(p, 'K', 0.)
