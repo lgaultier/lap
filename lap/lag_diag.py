@@ -36,7 +36,7 @@ def compute_lavd(p, plon, plat, ptime, pvort, mean_vort, t0=0):
     tini = t0 + 1
     for t in range(ntime - t0 - 2):
         tf = t + t0 + 2
-        index_f = min(int(tf * p.adv_time_step), ntime_vel - 2)
+        index_f = min(int(tf * p.adv_time_step / p.vel_step), ntime_vel - 2)
         lavd_tmp = numpy.sum(numpy.abs(pvort[t0 + 1: tf, :]
                              - mean_vort[index_f: index_f + 1, numpy.newaxis]),
                              axis=0)
