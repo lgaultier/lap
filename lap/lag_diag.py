@@ -34,17 +34,21 @@ def compute_lavd(p, plon, plat, ptime, pvort, mean_vort, t0=0):
     ntime_vel = numpy.shape(mean_vort)[0]
     #mean_vort = numpy.mean(pvort, axis=2)
     tini = t0 + 1
+    tvel = numpy.arange(0, numpy.shape(mean_vort)[0])
+    tpa = numpy.arange(0, ntime)
+
+    mvort_t = numpy.interp(tpa, tvel, mean_vort)
     for t in range(ntime - t0 - 2):
         tf = t + t0 + 2
         index_f = min(int(tf * p.adv_time_step / p.vel_step), ntime_vel - 2)
         lavd_tmp = numpy.sum(numpy.abs(pvort[t0 + 1: tf, :]
-                             - mean_vort[index_f: index_f + 1, numpy.newaxis]),
+                             - mvort_t[t0 + 1: tf, numpy.newaxis]),
                              axis=0)
-        lavd_t0 = numpy.abs(pvort[t0, :] - mean_vort[index_f]) / 2
-        lavd_t = numpy.abs(pvort[tf, :] - mean_vort[index_f + 1]) / 2
+        lavd_t0 = numpy.abs(pvort[t0, :] - mvort_t[t0]) / 2
+        lavd_t = numpy.abs(pvort[tf, :] - mvort_t[tf]) / 2
         lavd_tmp = lavd_tmp + lavd_t0 + lavd_t
         lavd_time[t] = ptime[tf] - ptime[t0]
-        lavd[t, :] = lavd_tmp
+        lavd[t, :] = lavd_tmp / lavd_time[t]
     return lavd, lavd_time
 
 
@@ -100,10 +104,21 @@ def lagrangian_diag(p):
 
     if 'LAVD' in p.diagnostic:
         p.save_RV = True
+        logger.info('load vorticity')
         VEL = mod_io.read_velocity(p)
-        mean_vort = numpy.mean(numpy.mean(VEL.RV, axis=2), axis=1)
-        lavd, lavd_t = compute_lavd(p, plon, plat, ptime, pvort, mean_vort,
+        abox = (p.parameter_grid[0], p.parameter_grid[1], p.parameter_grid[3],
+                p.parameter_grid[4])
+        index_lon = numpy.where((VEL.lon >= abox[0]) & (VEL.lon <= abox[1]))[0]
+        index_lat = numpy.where((VEL.lat >= abox[2]) & (VEL.lat <= abox[3]))[0]
+        vort_small = VEL.RV[:, numpy.min(index_lat): numpy.max(index_lat) + 1,
+                            numpy.min(index_lon): numpy.max(index_lon) + 1]
+        mean_vort = numpy.mean(numpy.mean(vort_small, axis=2), axis=1)
+        logger.info('compute lavd')
+        try:
+            lavd, lavd_t = compute_lavd(p, plon, plat, ptime, pvort, mean_vort,
                                     t0=t0)
+        except:
+            import pdb ; pdb.set_trace()
         lavd_2d = numpy.zeros((numpy.shape(lavd)[0], shape_grid[0],
                                shape_grid[1]))
         for t in range(numpy.shape(lavd)[0]):
