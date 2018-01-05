@@ -356,7 +356,9 @@ def read_velocity(p, get_time=None):
         # VEL.varv *=1.3
         mask = (numpy.ma.getmaskarray(VEL.varu)
                 | numpy.ma.getmaskarray(VEL.varv)
-                | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv))
+                | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv) # )
+                | (VEL.varu == p.missing_value)
+                | (VEL.varv == p.missing_value))
         # VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
         # VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
         if p.name_h is not None:
@@ -384,7 +386,7 @@ def read_velocity(p, get_time=None):
         # Compute Strain Relative Vorticity and Okubo Weiss
         if p.save_S or p.save_RV or p.save_OW:
             gfo = (9.81 / numpy.cos(numpy.mean((lat2du + lat2dv)/2)*pi/180.)
-                   / (2*7.2921*10**(-4)))
+                   / (2 * const.omega))
             dxlatu = (lat2du[2:, 1: -1] - lat2du[: -2, 1: -1])
             dylonu = (lon2du[1: -1, 2:] - lon2du[1: -1, : -2])
             dxlatv = (lat2dv[2:, 1: -1] - lat2dv[:-2, 1: -1])
@@ -405,7 +407,7 @@ def read_velocity(p, get_time=None):
         if p.name_h is not None:
             h[t, :, :] = + VEL.var
     step = numpy.sign(p.tadvection) * p.vel_step
-    stop = p.first_day + num_steps * numpy.sign(p.tadvection)
+    stop = p.first_day + int(abs(p.tadvection) + 1) * numpy.sign(p.tadvection)
     VEL.time = numpy.arange(p.first_day, stop, step)
     VEL.u = + u
     VEL.v = + v

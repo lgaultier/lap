@@ -217,12 +217,18 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     # Propagate position of particle with velocity
     deltat = (p.adv_time_step * const.day2sec) # * p.tadvection
               #/ float(sizeadvection))
-    transport = dlondt * deltat
+    # compute pure advection transport
+    transportu = dlondt * deltat
+    transportv = dlatdt * deltat
+    # Bera vera motion of a particule with a weight different from sea water
+    fo = numpy.cos(numpy.deg2rad(latpa)) * 2 * const.omega
+    tau = 2 * p.radius_part**2 / (9 * const.visc * p.weight_part)
+    inertial_partu = - tau * (p.weight_part - 1) * fo * transportv
+    inertial_partv = tau * (p.weight_part - 1) * fo * transportu
+    # compute turbulence if there is diffusion
     turbulence = p.B * rk + p.sigma * rk * deltat
-    # print(turbulence)
-    lonpa = lonpa + transport + turbulence[0]
-    transport = dlatdt * deltat
-    latpa = latpa + transport + turbulence[1]
+    lonpa = lonpa + transportu + inertial_partu + turbulence[0]
+    latpa = latpa + transportv + inertial_partv + turbulence[1]
     return rcoord, vcoord, dvcoord, lonpa, latpa, mask
 
 

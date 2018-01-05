@@ -57,12 +57,15 @@ def make_default(p):
     p.stationary = getattr(p, 'stationary', True)
     p.name_h = getattr(p, 'name_h', None)
     p.subsample = getattr(p, 'subsample', 1)
+    p.missing_value = getattr(p, 'missing_value', 0)
 
     # Advection parameters
     p.K = getattr(p, 'K', 0.)
     p.B = sqrt(2 * float(p.K)) / const.deg2km
     p.scale = getattr(p, 'scale', 1.)
     p.gamma = getattr(p, 'gamma', None)
+    p.weight_part = getattr(p, 'weight_part', 1)
+    p.radius_part = getattr(p, 'radius_part', 0)
 
     # outputs
     p.fill_value = getattr(p, 'fill_value', -1e36)

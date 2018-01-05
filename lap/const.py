@@ -6,7 +6,8 @@ sec2day = 1/86400.
 day2sec = 86400.
 Rearth = 6371000.0
 factor = 180./(pi*Rearth)
-
+visc = 1.83e-6
+omega = 7.2921*10**(-4)
 
 # - UNITS AND NAME
 unit = {"U": "m/s", "V": "m/s", "T": "degC", "lambda": "/days", "lon": "deg E",
