@@ -20,7 +20,8 @@ def read_data(filepath, nvar):
     return lon, lat, var
 
 
-def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None):
+def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None,
+                 vrange=None):
     pyplot.figure(figsize=(22, 8))
     ax = pyplot.axes(projection=cartopy.crs.PlateCarree())
     ax.set_extent(extent)
@@ -30,17 +31,21 @@ def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None):
     ax.gridlines(draw_labels=True,
                  linewidth=2, color='gray', alpha=0.5, linestyle='--')
     ax.stock_img()
-    pyplot.pcolormesh(lon, lat, data, cmap = 'jet',
-                      transform=cartopy.crs.PlateCarree())
+    if vrange is None:
+        pyplot.pcolormesh(lon, lat, data, cmap = 'jet',
+                          transform=cartopy.crs.PlateCarree())
+    else:
+        pyplot.pcolormesh(lon, lat, data, cmap = 'jet', vmin=-vrange,
+                          vmax=vrange, transform=cartopy.crs.PlateCarree())
     pyplot.colorbar()
-    if lon2 is not None and lat2 is not None:
+    if lons is not None and lats is not None:
         pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
     pyplot.savefig(output)
 
 
 def max_lavd(lon, lat, data):
     neighborhood_size = 20
-    threshold = 0.2
+    threshold = numpy.mean(data)
     data_max = filters.maximum_filter(data, neighborhood_size)
     data_min = filters.minimum_filter(data, neighborhood_size)
     diff = ((data_max - data_min) > threshold)
@@ -67,15 +72,30 @@ if '__main__' == __name__:
     extent = args.box
     lon, lat, lavd = read_data(args.lavd, 'LAVD')
     lon2, lat2, ow = read_data(args.ow, 'OW')
+    lon2, lat2, u = read_data(args.ow, 'U')
+    lon2, lat2, v = read_data(args.ow, 'V')
     file_split = os.path.splitext(os.path.basename(args.lavd))[0]
-    output = os.path.join(args.output_path, f'lavd_{file_split}.png')
+    output = os.path.join(args.output_path,
+                          f'lavd_{t}_{file_split}.png')
     data = lavd[t, :, :]
     data = filters.gaussian_filter(data, sigma=3)
     plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None)
     max_lon, max_lat = max_lavd(lon, lat, data)
-    output = os.path.join(args.output_path, f'lavd_min_max_{file_split}.png')
+    print(max_lon, max_lat)
+    output = os.path.join(args.output_path,
+                          f'lavd_min_max_{t}_{file_split}.png')
     plot_cartopy(lon, lat, data, extent, output, lons=max_lon, lats=max_lat)
-    output = os.path.join(args.output_path, f'ow_min_max_{file_split}.png')
-    plot_cartopy(lon2, lat2, ow[0, :, :] ,extent, output, lons=max_lon,
-                 lats=max_lat)
+    output = os.path.join(args.output_path,
+                          f'ow_min_max_{t}_{file_split}.png')
+    if 'natl' in file_split:
+        plot_cartopy(lon2, lat2, ow[0, :, :] ,extent, output, lons=max_lon,
+                     lats=max_lat, vrange=5e-2)
+    else:
+        plot_cartopy(lon2, lat2, ow[0, :, :] ,extent, output, lons=max_lon,
+                     lats=max_lat)
 
+    output = os.path.join(args.output_path,
+                          f'vel_min_max_{t}_{file_split}.png')
+    vel = numpy.sqrt(u**2 + v**2)
+    plot_cartopy(lon2, lat2, vel[0, :, :] ,extent, output, lons=max_lon,
+                 lats=max_lat, vrange=1)
