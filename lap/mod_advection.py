@@ -223,8 +223,8 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     # Bera vera motion of a particule with a weight different from sea water
     fo = numpy.cos(numpy.deg2rad(latpa)) * 2 * const.omega
     tau = 2 * p.radius_part**2 / (9 * const.visc * p.weight_part)
-    inertial_partu = - tau * (p.weight_part - 1) * fo * transportv
-    inertial_partv = tau * (p.weight_part - 1) * fo * transportu
+    inertial_partu = - tau * (p.weight_part - 1) * fo * dlatdt
+    inertial_partv = tau * (p.weight_part - 1) * fo * dlondt
     # compute turbulence if there is diffusion
     turbulence = p.B * rk + p.sigma * rk * deltat
     lonpa = lonpa + transportu + inertial_partu + turbulence[0]

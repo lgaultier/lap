@@ -70,15 +70,26 @@ def lagrangian_diag(p):
         grid = mod_io.make_grid(p)
     shape_grid = numpy.shape(grid.lon)
     print(shape_grid)
-    metx_all = []
-    mety_all = []
     mezic_all = []
-    for pa in range(num_pa):
-        if 'MET' in p.diagnostic:
-            metx, mety = compute_mets(plon[:, pa], plat[:, pa])
-            metx_all.append(metx)
-            mety_all.append(mety)
+    if 'MET' in p.diagnostic:
+        logger.info('compute MET')
+        metx_2d = numpy.empty((num_t - t0, shape_grid[0], shape_grid[1]))
+        mety_2d = numpy.empty((num_t - t0, shape_grid[0], shape_grid[1]))
+        for t in range(t0 + 1, num_t):
+            #metx_all = []
+            #mety_all = []
+            #for pa in range(num_pa):
+            #    metx, mety = compute_mets(plon[t0: t, pa], plat[t0: t, pa])
+            #    metx_all.append(metx)
+            #    mety_all.append(mety)
+            metx_all, mety_all = compute_mets(plon[t0: t, :], plat[t0: t, :])
+            metx_2d[t - t0, :, :] = numpy.array(metx_all).reshape(shape_grid)
+            mety_2d[t - t0, :, :] = numpy.array(mety_all).reshape(shape_grid)
+    else:
+        metx_2d = numpy.empty(shape_grid)
+        mety_2d = numpy.empty(shape_grid)
     if 'Mezic' in p.diagnostic:
+        logger.info('compute Mezic')
         xt0, yt0 = compute_mezic(plon[:, :], plat[:, :])
         xt0_2d = numpy.zeros((numpy.shape(xt0)[0], shape_grid[0],
                              shape_grid[1]))
@@ -91,18 +102,13 @@ def lagrangian_diag(p):
             yt0_2d[t, :, :] = numpy.array(yt0[t, :]).reshape()
             # mezic_strain[t, :, :] = det(
     #    mezic_all.append(mezic_strain)
-    if 'MET' in p.diagnostic:
-        metx_2d = numpy.array(metx_all).reshape(shape_grid)
-        mety_2d = numpy.array(mety_all).reshape(shape_grid)
-    else:
-        metx_2d = numpy.empty(shape_grid)
-        mety_2d = numpy.empty(shape_grid)
     if 'Mezic' in p.diagnostic:
         mezic_2d = numpy.array(mezic_all).reshape(shape_grid)
     else:
         mezic_2d = numpy.empty(shape_grid)
 
     if 'LAVD' in p.diagnostic:
+        logger.info('compute LAVD')
         p.save_RV = True
         logger.info('load vorticity')
         VEL = mod_io.read_velocity(p)
@@ -125,9 +131,10 @@ def lagrangian_diag(p):
             lavd_2d[t, :, :] = lavd[t, :].reshape(shape_grid)
     else:
         lavd_2d = numpy.empty(shape_grid)
-    time = numpy.arange(t0, (numpy.shape(lavd_2d)[0] + 1) * p.adv_time_step,
+    time = numpy.arange(t0, (numpy.shape(lavd_2d)[0] + 1) * p.adv_time_step-1,
                         p.adv_time_step)
     print(numpy.shape(time), numpy.shape(metx_2d), numpy.shape(lavd_2d))
+    logger.info('Write data')
     data={}
     data['lon'] = grid.lon
     data['lat'] = grid.lat

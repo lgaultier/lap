@@ -1,0 +1,103 @@
+# author Lucile Gaultier
+# python ~/src/lap_toolbox/example/plot/plot_trajectory.py
+#        /mnt/data/project/dimup/natl60_inst_advection_21215_21265.nc
+#        /mnt/data/project/dimup --box 290 325 34 55 --subsampling 11
+
+
+
+import os
+import numpy
+import logging
+import argparse
+import lap.utils.read_utils as read_utils
+import shapely.geometry as geoms
+import shapely
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot
+
+
+def init_cartopy(projection, box=[-180, 180, -90, 90]):
+    import cartopy
+    # projection = cartopy.crs.Mercator()
+    ax = pyplot.axes(projection=projection)
+    ax.add_feature(cartopy.feature.LAND, zorder=3)
+    ax.add_feature(cartopy.feature.COASTLINE, zorder=3)
+    ax.add_feature(cartopy.feature.LAKES, alpha=0.5, zorder=3)
+    ax.add_feature(cartopy.feature.RIVERS, zorder=3)
+    ax.set_extent([box[0], box[1], box[2], box[3]])
+    gl = ax.gridlines(draw_labels=True, linestyle='--', linewidth=2,
+                      alpha=0.5, color='gray')
+    gl.xlabels_top = False
+    gl.ylabels_left = False
+    # gl.xlocator = mticker.FixedLocator([-180, -45, 0, 45, 180])
+    return ax, gl
+
+
+def plot_trajectory(lon, lat, var, output, box, subsampling=25,
+                    is_cartopy=True):
+    from matplotlib import pyplot
+    import shapely
+    pyplot.figure(figsize=(15, 7))
+    if is_cartopy is True:
+        try:
+            import cartopy
+        except ImportError:
+            logger.warn('Cartopy is not available on this machine')
+            is_cartopy = False
+
+    if is_cartopy is True:
+        map_proj = cartopy.crs.Mercator()
+        data_proj = cartopy.crs.Geodetic()
+        ax, gl = init_cartopy(map_proj, box=box)
+        ax.add_feature(cartopy.feature.OCEAN, zorder=3)
+    else:
+        ax = pyplot.axes()
+    for pa in range(0, numpy.shape(lon)[1], subsampling):
+        if is_cartopy is True:
+            track = shapely.geometry.LineString(zip(lon[:, pa], lat[:, pa]))
+            pyplot.plot(lon[:, pa], lat[:, pa], linewidth=0.5,
+                        transform=data_proj)
+        else:
+            ax.plot(lon[:, pa], lat[:, pa], linewidth=0.5)
+    pyplot.savefig(output)
+
+
+def plot_2dfields(lon, lat, var, output, box, is_cartopy=True):
+    from matplotlib import pyplot
+    import shapely
+    pyplot.figure(figsize=(15, 7))
+    if is_cartopy is True:
+        try:
+            import cartopy
+        except ImportError:
+            logger.warn('Cartopy is not available on this machine')
+            is_cartopy = False
+
+    if is_cartopy is True:
+        map_proj = cartopy.crs.PlateCarree()
+        data_proj = cartopy.crs.PlateCarree()
+        ax, gl = init_cartopy(map_proj, box=box)
+    else:
+        ax = pyplot.axes()
+    if is_cartopy is True:
+        pyplot.pcolormesh(lon, lat, var, transform=data_proj, cmap='jet')
+    else:
+        pyplot.pcolormesh(lon, lat, var, cmap='jet')
+    pyplot.colorbar()
+    pyplot.savefig(output)
+
+
+def plot_histogram(metx, mety, output):
+    #pyplot.figure(figsize=(7, 15))
+    f, ax = pyplot.subplots(2, sharey='row')
+    n1, bins1, patches1 = ax[0].hist((metx.ravel()), 100, normed=1, facecolor='g',
+                                      alpha=0.75, edgecolor="none")
+    ax[0].set_ylabel('Probability')
+    ax[0].set_xlabel('Longitudinal MET')
+    #ax[0].axis([0, 14, 0, 0.45])
+    n2, bins2, patches2 = ax[1].hist((mety.ravel()), 100, normed=1, facecolor='r',
+                                      alpha=0.75, edgecolor="none")
+    ax[1].set_xlabel('Latitudinal MET')
+    #pyplot.axis([0, 14, 0, 0.45])
+    pyplot.savefig(output)
