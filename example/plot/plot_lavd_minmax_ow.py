@@ -72,6 +72,7 @@ if '__main__' == __name__:
     lon2, lat2, ow = read_data(args.ow, 'OW')
     lon2, lat2, u = read_data(args.ow, 'U')
     lon2, lat2, v = read_data(args.ow, 'V')
+    _, _, rv = read_data(args.ow, 'Vorticity')
     file_split = os.path.splitext(os.path.basename(args.lavd))[0]
     output = os.path.join(args.output_path,
                           f'lavd_{t}_{file_split}.png')
@@ -97,6 +98,14 @@ if '__main__' == __name__:
         plot_cartopy(lon2, lat2, ow[0, :, :] ,extent, output, lons=max_lon,
                      lats=max_lat)
 
+    output = os.path.join(args.output_path,
+                          f'vorticity_min_max_{t}_{file_split}.png')
+    if 'natl' in file_split:
+        plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
+                     lats=max_lat, vrange=[-5e-2, 5e-2])
+    else:
+        plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
+                     lats=max_lat)
     output = os.path.join(args.output_path,
                           f'vel_min_max_{t}_{file_split}.png')
     vel = numpy.sqrt(u**2 + v**2)
