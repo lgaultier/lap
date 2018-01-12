@@ -59,4 +59,6 @@ if '__main__' == __name__:
     output = os.path.join(output_path, f'mety_{t:03d}_{basename}.png')
     plot_tools.plot_2dfields(lon, lat, mety[t, :, :], output, extent)
     output = os.path.join(output_path, f'hist_{t:03d}_{basename}.png')
-    plot_tools.plot_histogram(metx[t, :, :], mety[t, :, :], output)
+    pother = (-0.20523, 5.15571, 3.01864, 0.04769, 3.19413, 1.51592)
+    pother = (-0.20199, 5.83660, 3.36631, 0.12884, 3.15708, 1.21617)
+    plot_tools.plot_histogram(metx[t, :, :], mety[t, :, :], output, pother=pother)

@@ -66,7 +66,7 @@ def plot_trajectory(lon, lat, var, output, box, subsampling=25,
 def plot_2dfields(lon, lat, var, output, box, is_cartopy=True):
     from matplotlib import pyplot
     import shapely
-    pyplot.figure(figsize=(15, 7))
+    pyplot.figure(figsize=(15, 4.5))
     if is_cartopy is True:
         try:
             import cartopy
@@ -88,16 +88,33 @@ def plot_2dfields(lon, lat, var, output, box, is_cartopy=True):
     pyplot.savefig(output)
 
 
-def plot_histogram(metx, mety, output):
+def plot_histogram(metx, mety, output, extrem_fit=True, pother=None):
+    from scipy.stats import genextreme
     #pyplot.figure(figsize=(7, 15))
     f, ax = pyplot.subplots(2, sharey='row')
     n1, bins1, patches1 = ax[0].hist((metx.ravel()), 100, normed=1, facecolor='g',
                                       alpha=0.75, edgecolor="none")
+    if extrem_fit is True:
+        p_fit = genextreme.fit(metx)
+        y_fit = genextreme.pdf(bins1, p_fit[0], p_fit[1], p_fit[2])
+        ax[0].plot(bins1, y_fit, 'b')
+        ax[0].set_title(f'{p_fit[0]:.5f} {p_fit[1]:.5f} {p_fit[2]:.5f}')
+        if pother is not None:
+            y_fit = genextreme.pdf(bins1, pother[0], pother[1], pother[2])
+            ax[0].plot(bins1, y_fit, 'k')
     ax[0].set_ylabel('Probability')
     ax[0].set_xlabel('Longitudinal MET')
     #ax[0].axis([0, 14, 0, 0.45])
     n2, bins2, patches2 = ax[1].hist((mety.ravel()), 100, normed=1, facecolor='r',
                                       alpha=0.75, edgecolor="none")
     ax[1].set_xlabel('Latitudinal MET')
+    if extrem_fit is True:
+        p_fit = genextreme.fit(mety)
+        y_fit = genextreme.pdf(bins2, p_fit[0], p_fit[1], p_fit[2])
+        ax[1].plot(bins2, y_fit, 'b')
+        ax[1].set_title(f'{p_fit[0]:.5f} {p_fit[1]:.5f} {p_fit[2]:.5f}')
+        if pother is not None:
+            y_fit = genextreme.pdf(bins2, pother[3], pother[4], pother[5])
+            ax[1].plot(bins2, y_fit, 'k')
     #pyplot.axis([0, 14, 0, 0.45])
     pyplot.savefig(output)

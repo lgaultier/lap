@@ -22,13 +22,13 @@ def read_data(filepath, nvar):
 
 
 def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None,
-                 vrange=None):
-    pyplot.figure(figsize=(22, 8))
+                 vrange=None, noocean=False):
+    pyplot.figure(figsize=(15, 4.5))
     map_proj = cartopy.crs.Mercator()
     data_proj = cartopy.crs.Geodetic()
     ax, gl = plot_tools.init_cartopy(map_proj, box=extent)
-
-    ax.stock_img()
+    if noocean is False:
+        ax.stock_img()
     if vrange is None:
         pyplot.pcolormesh(lon, lat, data, cmap = 'jet',
                           transform=cartopy.crs.PlateCarree())
@@ -50,6 +50,20 @@ def max_lavd(lon, lat, data, threshold):
     maxima = numpy.where((data==data_max) & ((data_max - data_min) > threshold))
     return lon[maxima], lat[maxima]
 
+
+def threshold_ow(lon, lat, ow, extent, threshold):
+    ind_lon = numpy.where((lon >= extent[0]) & (lon <= extent[1]))
+    ow_out = ow[:, ind_lon]
+    ind_lat = numpy.where((lat >= extent[2]) & (lat <= extent[3]))
+    ow_out = ow[ind_lat, :]
+
+    std_ow = numpy.nanstd(ow_out)
+    print(std_ow)
+    mask = numpy.where((ow > -threshold*std_ow) & (ow < threshold*std_ow))
+    ow_out = + ow
+    ow_out[mask] = numpy.nan
+    ow_out = numpy.ma.masked_invalid(ow_out)
+    return ow_out
 
 if '__main__' == __name__:
     # Parse inputs
@@ -89,20 +103,22 @@ if '__main__' == __name__:
                      lats=max_lat, vrange=[0, 2])
     else:
         plot_cartopy(lon, lat, data, extent, output, lons=max_lon, lats=max_lat)
+    thres_ow = 0.8
+    ow_th = threshold_ow(lon2, lat2, ow[0, :, :], extent, thres_ow)
     output = os.path.join(args.output_path,
                           f'ow_min_max_{t}_{file_split}.png')
     if 'natl' in file_split:
-        plot_cartopy(lon2, lat2, ow[0, :, :] ,extent, output, lons=max_lon,
+        plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
                      lats=max_lat, vrange=[-5e-2, 5e-2])
     else:
-        plot_cartopy(lon2, lat2, ow[0, :, :] ,extent, output, lons=max_lon,
-                     lats=max_lat)
+        plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
+                     lats=max_lat, noocean=True)
 
     output = os.path.join(args.output_path,
                           f'vorticity_min_max_{t}_{file_split}.png')
     if 'natl' in file_split:
         plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
-                     lats=max_lat, vrange=[-5e-2, 5e-2])
+                     lats=max_lat, vrange=[-0.3, 0.3])
     else:
         plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
                      lats=max_lat)
