@@ -38,6 +38,8 @@ def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None,
     pyplot.colorbar()
     if lons is not None and lats is not None:
         pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
+        pyplot.scatter(lons, lats, c='k', marker='+',
+                       transform=cartopy.crs.PlateCarree())
     pyplot.savefig(output)
 
 

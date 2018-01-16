@@ -91,14 +91,14 @@ def plot_2dfields(lon, lat, var, output, box, is_cartopy=True):
 def plot_histogram(metx, mety, output, extrem_fit=True, pother=None):
     from scipy.stats import genextreme
     #pyplot.figure(figsize=(7, 15))
-    f, ax = pyplot.subplots(2, sharey='row')
+    f, ax = pyplot.subplots(1, 2, sharey=True)
     n1, bins1, patches1 = ax[0].hist((metx.ravel()), 100, normed=1, facecolor='g',
                                       alpha=0.75, edgecolor="none")
     if extrem_fit is True:
         p_fit = genextreme.fit(metx)
         y_fit = genextreme.pdf(bins1, p_fit[0], p_fit[1], p_fit[2])
         ax[0].plot(bins1, y_fit, 'b')
-        ax[0].set_title(f'{p_fit[0]:.5f} {p_fit[1]:.5f} {p_fit[2]:.5f}')
+        # ax[0].set_title(f'{p_fit[0]:.5f} {p_fit[1]:.5f} {p_fit[2]:.5f}')
         if pother is not None:
             y_fit = genextreme.pdf(bins1, pother[0], pother[1], pother[2])
             ax[0].plot(bins1, y_fit, 'k')
@@ -112,7 +112,7 @@ def plot_histogram(metx, mety, output, extrem_fit=True, pother=None):
         p_fit = genextreme.fit(mety)
         y_fit = genextreme.pdf(bins2, p_fit[0], p_fit[1], p_fit[2])
         ax[1].plot(bins2, y_fit, 'b')
-        ax[1].set_title(f'{p_fit[0]:.5f} {p_fit[1]:.5f} {p_fit[2]:.5f}')
+        # ax[1].set_title(f'{p_fit[0]:.5f} {p_fit[1]:.5f} {p_fit[2]:.5f}')
         if pother is not None:
             y_fit = genextreme.pdf(bins2, pother[3], pother[4], pother[5])
             ax[1].plot(bins2, y_fit, 'k')
