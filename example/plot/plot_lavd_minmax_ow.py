@@ -58,7 +58,7 @@ def threshold_ow(lon, lat, ow, extent, threshold):
     ow_out = ow[:, ind_lon]
     ind_lat = numpy.where((lat >= extent[2]) & (lat <= extent[3]))
     ow_out = ow[ind_lat, :]
-
+    ow_out[abs(ow_out) > 1] = numpy.nan
     std_ow = numpy.nanstd(ow_out)
     print(std_ow)
     mask = numpy.where((ow > -threshold*std_ow) & (ow < threshold*std_ow))
@@ -105,13 +105,13 @@ if '__main__' == __name__:
                      lats=max_lat, vrange=[0, 2])
     else:
         plot_cartopy(lon, lat, data, extent, output, lons=max_lon, lats=max_lat)
-    thres_ow = 0.8
+    thres_ow = 0.08
     ow_th = threshold_ow(lon2, lat2, ow[0, :, :], extent, thres_ow)
     output = os.path.join(args.output_path,
                           f'ow_min_max_{t}_{file_split}.png')
     if 'natl' in file_split:
         plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
-                     lats=max_lat, vrange=[-5e-2, 5e-2])
+                     lats=max_lat, vrange=[-5e-2, 5e-2], noocean=True)
     else:
         plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
                      lats=max_lat, noocean=True)
