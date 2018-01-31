@@ -22,7 +22,7 @@ def read_data(filepath, nvar):
 
 
 def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None,
-                 vrange=None, noocean=False):
+                 vrange=None, noocean=False, cs_lon=None, cs_lat=None):
     pyplot.figure(figsize=(15, 4.5))
     map_proj = cartopy.crs.Mercator()
     data_proj = cartopy.crs.Geodetic()
@@ -40,10 +40,16 @@ def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None,
         pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
         pyplot.scatter(lons, lats, c='k', marker='+',
                        transform=cartopy.crs.PlateCarree())
+    if cs_lon is not None and cs_lat is not None:
+        print(len(cs_lon))
+        for i in range(len(cs_lon)):
+            pyplot.plot(cs_lon[i], cs_lat[i], linewidth=2,
+                        transform=cartopy.crs.PlateCarree())
     pyplot.savefig(output)
 
 
 def max_lavd(lon, lat, data, threshold):
+    data = filters.gaussian_filter(data, sigma=2)
     neighborhood_size = int(1.5 / numpy.nanmean(abs(lon[:, 1:]-lon[:, :-1])))
     # threshold = numpy.mean(data)
     data_max = filters.maximum_filter(data, neighborhood_size)
@@ -67,7 +73,27 @@ def threshold_ow(lon, lat, ow, extent, threshold):
     ow_out = numpy.ma.masked_invalid(ow_out)
     return ow_out
 
-def plot_trajectory(lon, lat, var, output, box, contours, subsampling=1,
+
+def get_contours(lon, lat, data, threshold):
+    from skimage import measure
+    # Find contours at a constant value of 0.8
+    data = filters.gaussian_filter(data, sigma=4)
+    threshold = numpy.percentile(data, 80)
+    print(threshold)
+    contours = measure.find_contours(data, threshold)
+    cs_lon = []
+    cs_lat = []
+    # import pdb ; pdb.set_trace()
+    for i in range(len(contours)):
+         cs_lon.append(lon[numpy.array(contours[i][:, 0], dtype=int),
+                           numpy.array(contours[i][:, 1], dtype=int)])
+         cs_lat.append(lat[numpy.array(contours[i][:, 0], dtype=int),
+                           numpy.array(contours[i][:, 1], dtype=int)])
+        # print(numpy.shape(cs_lon), numpy.shape(cs_lat))
+    return cs_lon, cs_lat
+
+
+def plot_trajectory(lon, lat, var, output, box, subsampling=1,
                     is_cartopy=True):
     from matplotlib import pyplot
     import shapely
@@ -96,8 +122,8 @@ def plot_trajectory(lon, lat, var, output, box, contours, subsampling=1,
                         transform=data_proj)
         else:
             ax.plot(lon[:, pa], lat[:, pa], linewidth=0.5)
-    for n, contour in enumerate(contours):
-        ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
+    #for n, contour in enumerate(contours):
+    #    ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
     pyplot.savefig(output)
 
 
@@ -136,11 +162,13 @@ if '__main__' == __name__:
     max_lon, max_lat, maxima = max_lavd(lon, lat, data, threshold)
     output = os.path.join(args.output_path,
                           f'lavd_min_max_{t}_{file_split}.png')
+    cs_lon, cs_lat = get_contours(lon, lat, data, numpy.nanmean(data))
     if 'natl' in file_split:
         plot_cartopy(lon, lat, data, extent, output, lons=max_lon,
-                     lats=max_lat, vrange=[0, 2])
+                     lats=max_lat, vrange=[0, 2], cs_lon=cs_lon, cs_lat=cs_lat)
     else:
-        plot_cartopy(lon, lat, data, extent, output, lons=max_lon, lats=max_lat)
+        plot_cartopy(lon, lat, data, extent, output, lons=max_lon,
+                     lats=max_lat, cs_lon=cs_lon, cs_lat=cs_lat)
     if args.ow is not None:
         thres_ow = 0.08
         ow_th = threshold_ow(lon2, lat2, ow[0, :, :], extent, thres_ow)
@@ -148,19 +176,23 @@ if '__main__' == __name__:
                               f'ow_min_max_{t}_{file_split}.png')
         if 'natl' in file_split:
             plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
-                         lats=max_lat, vrange=[-5e-2, 5e-2], noocean=True)
+                         lats=max_lat, vrange=[-5e-2, 5e-2], noocean=True,
+                         cs_lon=cs_lon, cs_lat=cs_lat)
         else:
             plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
-                         lats=max_lat, noocean=True)
+                         lats=max_lat, noocean=True,
+                         cs_lon=cs_lon, cs_lat=cs_lat)
 
         output = os.path.join(args.output_path,
                               f'vorticity_min_max_{t}_{file_split}.png')
         if 'natl' in file_split:
             plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
-                         lats=max_lat, vrange=[-0.3, 0.3])
+                         lats=max_lat, vrange=[-0.3, 0.3],
+                         cs_lon=cs_lon, cs_lat=cs_lat)
         else:
             plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
-                         lats=max_lat)
+                         lats=max_lat,
+                         cs_lon=cs_lon, cs_lat=cs_lat)
         output = os.path.join(args.output_path,
                               f'vel_min_max_{t}_{file_split}.png')
         vel = numpy.sqrt(u**2 + v**2)
@@ -171,17 +203,13 @@ if '__main__' == __name__:
         __, __, hlon = read_data(args.trajectory, 'lon_hr')
         __, __, hlat = read_data(args.trajectory, 'lat_hr')
         print(maxima)
-        output = os.path.join(args.output_path, f'traj_{file_split}.png')
+        output = os.path.join(args.output_path, f'traj_{t}_{file_split}.png')
         # flat_index = col + row * num_cols
         num_cols = numpy.shape(lavd)[2]
         flat_index = maxima[1] + maxima[0] * num_cols
         print(flat_index, numpy.shape(hlon)) #[:, flat_index]))
     #    plot_trajectory()
-        from skimage import measure
-
-        # Find contours at a constant value of 0.8
-        contours = measure.find_contours(lavd[t, :, :], 0.8)
 
         plot_trajectory(hlon[:, flat_index], hlat[:, flat_index],
-                        vort[:, flat_index], output, extent, contours,
+                        vort[:, flat_index], output, extent,
                         subsampling=1)
