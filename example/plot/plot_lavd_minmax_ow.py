@@ -21,8 +21,8 @@ def read_data(filepath, nvar):
     return lon, lat, var
 
 
-def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None,
-                 vrange=None, noocean=False, cs_lon=None, cs_lat=None):
+def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None, lonsnf=None, latsnf=None, 
+                 vrange=None, noocean=False, cs_lon=None, cs_lat=None, poly=None):
     pyplot.figure(figsize=(15, 4.5))
     map_proj = cartopy.crs.Mercator()
     data_proj = cartopy.crs.Geodetic()
@@ -36,15 +36,22 @@ def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None,
         pyplot.pcolormesh(lon, lat, data, cmap = 'jet', vmin=vrange[0],
                           vmax=vrange[1], transform=cartopy.crs.PlateCarree())
     pyplot.colorbar()
-    if lons is not None and lats is not None:
-        pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
-        pyplot.scatter(lons, lats, c='k', marker='+',
-                       transform=cartopy.crs.PlateCarree())
     if cs_lon is not None and cs_lat is not None:
-        print(len(cs_lon))
         for i in range(len(cs_lon)):
             pyplot.plot(cs_lon[i], cs_lat[i], linewidth=2,
                         transform=cartopy.crs.PlateCarree())
+    if poly is not None:
+        for i in range(len(poly)):
+            pyplot.plot(poly[i][:, 0], poly[i][:, 1], 'k', linewidth=2,
+                                    transform=cartopy.crs.PlateCarree())
+    if lons is not None and lats is not None and len(lons) > 0:
+        pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
+        pyplot.scatter(lons, lats, c='k', marker='+',
+                       transform=cartopy.crs.PlateCarree())
+    if lonsnf is not None and latsnf is not None and len(lonsnf) > 0:
+        #pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
+        pyplot.scatter(lonsnf, latsnf, c='r', marker='+',
+                       transform=cartopy.crs.PlateCarree())
     pyplot.savefig(output)
 
 
@@ -78,19 +85,62 @@ def get_contours(lon, lat, data, threshold):
     from skimage import measure
     # Find contours at a constant value of 0.8
     data = filters.gaussian_filter(data, sigma=4)
-    threshold = numpy.percentile(data, 80)
-    print(threshold)
-    contours = measure.find_contours(data, threshold)
     cs_lon = []
     cs_lat = []
-    # import pdb ; pdb.set_trace()
-    for i in range(len(contours)):
-         cs_lon.append(lon[numpy.array(contours[i][:, 0], dtype=int),
-                           numpy.array(contours[i][:, 1], dtype=int)])
-         cs_lat.append(lat[numpy.array(contours[i][:, 0], dtype=int),
-                           numpy.array(contours[i][:, 1], dtype=int)])
-        # print(numpy.shape(cs_lon), numpy.shape(cs_lat))
-    return cs_lon, cs_lat
+    all_polys = []
+    for perc in range(50, 99, 5):
+        threshold = numpy.percentile(data, perc)
+        contours = measure.find_contours(data, threshold)
+        # import pdb ; pdb.set_trace()
+        for i in range(len(contours)):
+             ## Append if contour is convex
+             coords = measure.approximate_polygon(contours[i], tolerance=4.5)
+             c = numpy.zeros((numpy.shape(coords)[0] - 2))
+             for k in range(1, numpy.shape(coords)[0] - 1):
+                 c[k-1] = ((coords[k, 0] - coords[k-1, 0])
+                         / (coords[k+1, 1] - coords[k, 1])
+                         - (coords[k, 1] - coords[k-1, 1])
+                         / (coords[k+1, 0] - coords[k, 0]))
+             if not numpy.all(c >= 0) and not numpy.all(c <= 0):
+                 continue
+             coords = measure.approximate_polygon(contours[i], tolerance=0)
+             cs_lon.append(lon[numpy.array(contours[i][:, 0], dtype=int),
+                               numpy.array(contours[i][:, 1], dtype=int)])
+             cs_lat.append(lat[numpy.array(contours[i][:, 0], dtype=int),
+                               numpy.array(contours[i][:, 1], dtype=int)])
+
+             polygon = [[lon[int(x[0]), int(x[1])], lat[int(x[0]), int(x[1])]] for x in coords]
+             all_polys.append(numpy.array(polygon))
+    #import pdb ; pdb.set_trace()
+    print(numpy.shape(cs_lon), 'get_contour: cs_lon')
+    return cs_lon, cs_lat, all_polys
+
+
+def filter_max(lon, lat, maxima, polys):
+    import shapely
+
+    polygons = []
+    for i in range(len(polys)):
+        if numpy.shape(polys[i])[0] > 2:
+            linear_ring = shapely.geometry.polygon.LinearRing(polys[i])
+            polygon = shapely.geometry.polygon.asPolygon(linear_ring)
+            polygons.append(polygon)
+
+    out_lon = []
+    out_lat = []
+    out_i = []
+    out_j = []
+    for i in range(len(lon)):
+        point = shapely.geometry.point.Point(lon[i], lat[i])
+        for j in range(len(polygons)):
+            point_in_polygon = polygons[j].contains(point)
+            if point_in_polygon is True:
+                out_lon.append(lon[i])
+                out_lat.append(lat[i])
+                out_i.append(maxima[0][i])
+                out_j.append(maxima[1][i])
+                break
+    return out_lon, out_lat, [out_i, out_j]
 
 
 def plot_trajectory(lon, lat, var, output, box, subsampling=1,
@@ -113,7 +163,7 @@ def plot_trajectory(lon, lat, var, output, box, subsampling=1,
         ax = pyplot.axes()
     for pa in range(0, numpy.shape(lon)[1], subsampling):
         if is_cartopy is True:
-            track = shapely.geometry.LineString(zip(lon[:, pa], lat[:, pa]))
+            #track = shapely.geometry.LineString(zip(lon[:, pa], lat[:, pa]))
             #track = geoms.LineString(zip(lon[:, pa], lat[:, pa]))
             # Buffer linestring by two degrees
             # track_buffer = track.buffer(0.5)
@@ -162,10 +212,13 @@ if '__main__' == __name__:
     max_lon, max_lat, maxima = max_lavd(lon, lat, data, threshold)
     output = os.path.join(args.output_path,
                           f'lavd_min_max_{t}_{file_split}.png')
-    cs_lon, cs_lat = get_contours(lon, lat, data, numpy.nanmean(data))
+    cs_lon, cs_lat, polys = get_contours(lon, lat, data, numpy.nanmean(data))
+    max_lon2, max_lat2, maxima2 = filter_max(max_lon, max_lat, maxima, polys)
     if 'natl' in file_split:
-        plot_cartopy(lon, lat, data, extent, output, lons=max_lon,
-                     lats=max_lat, vrange=[0, 2], cs_lon=cs_lon, cs_lat=cs_lat)
+        #plot_cartopy(lon, lat, data, extent, output, lons=max_lon,
+        #            lats=max_lat, vrange=[0, 2], cs_lon=cs_lon, cs_lat=cs_lat)
+        plot_cartopy(lon, lat, data, extent, output, lons=max_lon2,
+                     lats=max_lat2, vrange=[0, 2], poly=polys)
     else:
         plot_cartopy(lon, lat, data, extent, output, lons=max_lon,
                      lats=max_lat, cs_lon=cs_lon, cs_lat=cs_lat)
@@ -175,23 +228,23 @@ if '__main__' == __name__:
         output = os.path.join(args.output_path,
                               f'ow_min_max_{t}_{file_split}.png')
         if 'natl' in file_split:
-            plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
-                         lats=max_lat, vrange=[-5e-2, 5e-2], noocean=True,
+            plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon2,
+                         lats=max_lat2, vrange=[-5e-2, 5e-2], noocean=True,
                          cs_lon=cs_lon, cs_lat=cs_lat)
         else:
-            plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon,
-                         lats=max_lat, noocean=True,
+            plot_cartopy(lon2, lat2, ow_th[:, :] ,extent, output, lons=max_lon2,
+                         lats=max_lat2, noocean=True,
                          cs_lon=cs_lon, cs_lat=cs_lat)
 
         output = os.path.join(args.output_path,
                               f'vorticity_min_max_{t}_{file_split}.png')
         if 'natl' in file_split:
-            plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
-                         lats=max_lat, vrange=[-0.3, 0.3],
+            plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon2,
+                         lats=max_lat2, vrange=[-0.3, 0.3],
                          cs_lon=cs_lon, cs_lat=cs_lat)
         else:
-            plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon,
-                         lats=max_lat,
+            plot_cartopy(lon2, lat2, rv[0, :, :] ,extent, output, lons=max_lon2,
+                         lats=max_lat2,
                          cs_lon=cs_lon, cs_lat=cs_lat)
         output = os.path.join(args.output_path,
                               f'vel_min_max_{t}_{file_split}.png')
@@ -202,14 +255,25 @@ if '__main__' == __name__:
         __, __, vort = read_data(args.trajectory, 'Vorticity')
         __, __, hlon = read_data(args.trajectory, 'lon_hr')
         __, __, hlat = read_data(args.trajectory, 'lat_hr')
-        print(maxima)
+        print(maxima2, maxima)
         output = os.path.join(args.output_path, f'traj_{t}_{file_split}.png')
         # flat_index = col + row * num_cols
         num_cols = numpy.shape(lavd)[2]
         flat_index = maxima[1] + maxima[0] * num_cols
-        print(flat_index, numpy.shape(hlon)) #[:, flat_index]))
     #    plot_trajectory()
 
         plot_trajectory(hlon[:, flat_index], hlat[:, flat_index],
                         vort[:, flat_index], output, extent,
                         subsampling=1)
+
+        output = os.path.join(args.output_path, f'traj2_{t}_{file_split}.png')
+        # flat_index = col + row * num_cols
+        num_cols = numpy.shape(lavd)[2]
+        flat_index = numpy.array(maxima2[1]) + numpy.array(maxima2[0]) * num_cols
+        print(flat_index)
+    #    plot_trajectory()
+
+        plot_trajectory(hlon[:, flat_index], hlat[:, flat_index],
+                        vort[:, flat_index], output, extent,
+                        subsampling=1)
+
