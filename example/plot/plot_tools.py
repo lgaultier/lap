@@ -85,6 +85,33 @@ def plot_2dfields(lon, lat, var, output, box, is_cartopy=True):
     pyplot.savefig(output)
 
 
+def plot_quiver(lon, lat, uvar, vvar, output, box, scale, is_cartopy=True):
+    from matplotlib import pyplot
+    import shapely
+    pyplot.figure(figsize=(15, 4.5))
+    if is_cartopy is True:
+        try:
+            import cartopy
+        except ImportError:
+            logger.warn('Cartopy is not available on this machine')
+            is_cartopy = False
+
+    if is_cartopy is True:
+        map_proj = cartopy.crs.PlateCarree()
+        data_proj = cartopy.crs.PlateCarree()
+        ax, gl = init_cartopy(map_proj, box=box)
+    else:
+        ax = pyplot.axes()
+    norm = numpy.sqrt(uvar **2 + vvar **2)
+    if is_cartopy is True:
+        pyplot.quiver(lon, lat, uvar, vvar, norm, units='xy', scale=scale,
+                      transform=data_proj)
+    else:
+        pyplot.quiver(lon, lat, uvar, vvar, norm, units='xy', scale=scale)
+    pyplot.colorbar()
+    pyplot.savefig(output)
+
+
 def plot_histogram(metx, mety, output, extrem_fit=True, pother=None):
     from scipy.stats import genextreme
     #pyplot.figure(figsize=(7, 15))
