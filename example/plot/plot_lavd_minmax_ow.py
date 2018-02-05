@@ -1,7 +1,11 @@
 # author Lucile Gaultier
-# python ~/src/lap_toolbox/example/plotplot_lavd_ow.py -o /mnt/data/project/dimup -t 500
-# /mnt/data/project/dimup/aviso_lag_diag_20819_20898.nc
-# ./eulerian_aviso/eulerian_020819.nc
+# python ~/src/lap_toolbox/example/plot/plot_lavd_minmax_ow.py
+# /mnt/data/project/dimup/gc_geos_lag_diag_20819_20898.nc
+# -o /mnt/data/project/dimup -t 500 --trajectory
+# /mnt/data/project/dimup/gc_geos_inst_heavy_advection_21184_21274.nc
+#--ow ~/test/dimup/test_lap/eulerian_globcurrent_geos/eulerian_021184.nc
+# -b 295 315 35 43
+
 
 import numpy
 import os
@@ -24,35 +28,36 @@ def read_data(filepath, nvar):
 def plot_cartopy(lon, lat, data, extent, output, lons=None, lats=None, lonsnf=None, latsnf=None, 
                  vrange=None, noocean=False, cs_lon=None, cs_lat=None, poly=None):
     pyplot.figure(figsize=(15, 4.5))
-    map_proj = cartopy.crs.Mercator()
-    data_proj = cartopy.crs.Geodetic()
+    map_proj = cartopy.crs.PlateCarree()
+    data_proj = cartopy.crs.PlateCarree()
     ax, gl = plot_tools.init_cartopy(map_proj, box=extent)
     if noocean is False:
         ax.stock_img()
     if vrange is None:
         pyplot.pcolormesh(lon, lat, data, cmap = 'jet',
-                          transform=cartopy.crs.PlateCarree())
+                          transform=data_proj)
     else:
         pyplot.pcolormesh(lon, lat, data, cmap = 'jet', vmin=vrange[0],
-                          vmax=vrange[1], transform=cartopy.crs.PlateCarree())
+                          vmax=vrange[1], transform=data_proj)
     pyplot.colorbar()
     if cs_lon is not None and cs_lat is not None:
         for i in range(len(cs_lon)):
             pyplot.plot(cs_lon[i], cs_lat[i], linewidth=2,
-                        transform=cartopy.crs.PlateCarree())
+                        transform=data_proj)
     if poly is not None:
         for i in range(len(poly)):
             pyplot.plot(poly[i][:, 0], poly[i][:, 1], 'k', linewidth=2,
-                                    transform=cartopy.crs.PlateCarree())
+                                    transform=data_proj)
     if lons is not None and lats is not None and len(lons) > 0:
-        pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
+        pyplot.scatter(lons, lats, c='w', transform=data_proj)
         pyplot.scatter(lons, lats, c='k', marker='+',
-                       transform=cartopy.crs.PlateCarree())
+                       transform=data_proj)
     if lonsnf is not None and latsnf is not None and len(lonsnf) > 0:
         #pyplot.scatter(lons, lats, c='w', transform=cartopy.crs.PlateCarree())
-        pyplot.scatter(lonsnf, latsnf, c='r', marker='+',
-                       transform=cartopy.crs.PlateCarree())
+        pyplot.scatter(lonsnf, latsnf, c='r', marker='*',
+                       transform=data_proj)
     pyplot.savefig(output)
+    pyplot.close()
 
 
 def max_lavd(lon, lat, data, threshold):
@@ -88,7 +93,7 @@ def get_contours(lon, lat, data, threshold):
     cs_lon = []
     cs_lat = []
     all_polys = []
-    for perc in range(50, 99, 5):
+    for perc in range(50, 100, 4):
         threshold = numpy.percentile(data, perc)
         contours = measure.find_contours(data, threshold)
         # import pdb ; pdb.set_trace()
@@ -109,9 +114,9 @@ def get_contours(lon, lat, data, threshold):
              cs_lat.append(lat[numpy.array(contours[i][:, 0], dtype=int),
                                numpy.array(contours[i][:, 1], dtype=int)])
 
-             polygon = [[lon[int(x[0]), int(x[1])], lat[int(x[0]), int(x[1])]] for x in coords]
+             polygon = [[lon[int(x[0]), int(x[1])], lat[int(x[0]), int(x[1])]]
+                        for x in coords]
              all_polys.append(numpy.array(polygon))
-    #import pdb ; pdb.set_trace()
     print(numpy.shape(cs_lon), 'get_contour: cs_lon')
     return cs_lon, cs_lat, all_polys
 
@@ -141,40 +146,6 @@ def filter_max(lon, lat, maxima, polys):
                 out_j.append(maxima[1][i])
                 break
     return out_lon, out_lat, [out_i, out_j]
-
-
-def plot_trajectory(lon, lat, var, output, box, subsampling=1,
-                    is_cartopy=True):
-    from matplotlib import pyplot
-    import shapely
-    pyplot.figure(figsize=(20, 20))
-    if is_cartopy is True:
-        try:
-            import cartopy
-        except ImportError:
-            logger.warn('Cartopy is not available on this machine')
-            is_cartopy = False
-
-    if is_cartopy is True:
-        map_proj = cartopy.crs.Mercator()
-        data_proj = cartopy.crs.Geodetic()
-        ax, gl = plot_tools.init_cartopy(map_proj, box=box)
-    else:
-        ax = pyplot.axes()
-    for pa in range(0, numpy.shape(lon)[1], subsampling):
-        if is_cartopy is True:
-            #track = shapely.geometry.LineString(zip(lon[:, pa], lat[:, pa]))
-            #track = geoms.LineString(zip(lon[:, pa], lat[:, pa]))
-            # Buffer linestring by two degrees
-            # track_buffer = track.buffer(0.5)
-            # ax.add_geometries([track], map_proj)
-            pyplot.plot(lon[:, pa], lat[:, pa], linewidth=0.5,
-                        transform=data_proj)
-        else:
-            ax.plot(lon[:, pa], lat[:, pa], linewidth=0.5)
-    #for n, contour in enumerate(contours):
-    #    ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
-    pyplot.savefig(output)
 
 
 if '__main__' == __name__:
@@ -262,9 +233,9 @@ if '__main__' == __name__:
         flat_index = maxima[1] + maxima[0] * num_cols
     #    plot_trajectory()
 
-        plot_trajectory(hlon[:, flat_index], hlat[:, flat_index],
-                        vort[:, flat_index], output, extent,
-                        subsampling=1)
+        plot_tools.plot_trajectory(hlon[:, flat_index], hlat[:, flat_index],
+                                   vort[:, flat_index], output, extent,
+                                   subsampling=1)
 
         output = os.path.join(args.output_path, f'traj2_{t}_{file_split}.png')
         # flat_index = col + row * num_cols
@@ -273,7 +244,7 @@ if '__main__' == __name__:
         print(flat_index)
     #    plot_trajectory()
 
-        plot_trajectory(hlon[:, flat_index], hlat[:, flat_index],
+        plot_tools.plot_trajectory(hlon[:, flat_index], hlat[:, flat_index],
                         vort[:, flat_index], output, extent,
                         subsampling=1)
 

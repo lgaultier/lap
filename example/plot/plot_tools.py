@@ -1,8 +1,4 @@
 # author Lucile Gaultier
-# python ~/src/lap_toolbox/example/plot/plot_trajectory.py
-#        /mnt/data/project/dimup/natl60_inst_advection_21215_21265.nc
-#        /mnt/data/project/dimup --box 290 325 34 55 --subsampling 11
-
 
 
 import os
@@ -34,7 +30,7 @@ def init_cartopy(projection, box=[-180, 180, -90, 90]):
     return ax, gl
 
 
-def plot_trajectory(lon, lat, var, output, box, subsampling=25,
+def plot_trajectory(lon, lat, var, output, box, subsampling=25, noocean=False,
                     is_cartopy=True):
     from matplotlib import pyplot
     import shapely
@@ -50,16 +46,17 @@ def plot_trajectory(lon, lat, var, output, box, subsampling=25,
         map_proj = cartopy.crs.Mercator()
         data_proj = cartopy.crs.Geodetic()
         ax, gl = init_cartopy(map_proj, box=box)
-        ax.add_feature(cartopy.feature.OCEAN, zorder=3)
+        if noocean is False:
+            ax.add_feature(cartopy.feature.OCEAN, zorder=3)
     else:
         ax = pyplot.axes()
     for pa in range(0, numpy.shape(lon)[1], subsampling):
         if is_cartopy is True:
             track = shapely.geometry.LineString(zip(lon[:, pa], lat[:, pa]))
-            pyplot.plot(lon[:, pa], lat[:, pa], linewidth=0.5,
+            pyplot.plot(lon[:, pa], lat[:, pa], linewidth=2,
                         transform=data_proj)
         else:
-            ax.plot(lon[:, pa], lat[:, pa], linewidth=0.5)
+            ax.plot(lon[:, pa], lat[:, pa], linewidth=2)
     pyplot.savefig(output)
 
 
