@@ -39,7 +39,7 @@ def run_drifter(p):
         logger.info(f'Loading grid for advection for processor {rank}')
         # - Read or make advection grid
         if p.make_grid is False:
-            grid = mod_io.read_grid_netcdf(p)
+            grid = mod_io.read_grid_tiff(p)
         else:
             grid = mod_io.make_grid(p)
         # Make a list of particles out of the previous grid

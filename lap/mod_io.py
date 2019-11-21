@@ -173,6 +173,27 @@ def read_grid_netcdf(p):
     get_regular_tracer(p, Tr, get_coord=True)
     return Tr
 
+def read_grid_tiff(p)
+    import gdal
+    from osgeo import osr
+    ds = gdal.Open(p.file_grid)
+    band = ds.GetRasterBand(1)
+    arr = band.ReadAsArray()
+    xoff, a, b, yoff, d, e = ds.GetGeoTransform()
+    x = numpy.arange(ds.RasterXSize)
+    y = numpy.arange(ds.RasterYSize)
+    x = numpy.array([x,]*ds.RasterYSize)
+    y = numpy.array([y,]*ds.RasterXSize).transpose()
+    xp = numpy.zeros(numpy.shape(x))
+    yp = numpy.zeros(numpy.shape(y))
+    xp = a * x + b * y + xoff
+    yp = d * x + e * y + yoff
+    Tr.lon = xp[arr > 0]
+    Tr.lat = yp[arr > 0]
+    Tr.var = arr[arr > 0]
+    mask = numpy.isnan(Tr.var)
+    return Tr
+
 
 # TODO is it used?
 def Read_listgrid_netcdf(p, dict_tracer, jdate):
