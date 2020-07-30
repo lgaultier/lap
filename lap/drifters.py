@@ -24,6 +24,16 @@ import lap.utils.general_utils as utils
 import logging
 logger = logging.getLogger(__name__)
 
+def drifter(p, VEL, grid=None):
+    mod_tools.make_default(p)
+    if p.make_grid is False:
+        grid = mod_io.read_grid_tiff(p)
+    else:
+        grid = mod_io.make_grid(p)
+    # Make a list of particles out of the previous grid
+    utils.make_list_particles(grid)
+
+
 
 def run_drifter(p):
     # - Initialize variables from parameter file
@@ -67,20 +77,41 @@ def run_drifter(p):
     # - Read velocity
     if rank == 0:
         logger.info('Loading Velocity')
-    VEL = mod_io.read_velocity(p)
+	VEL = mod_io.read_velocity(p)
+        if len(numpy.shape(VEL.u)) > 2:
+            _interp_u = []
+            _interp_v = []
+            for t in range(numpy.shape(VEL.u)[0]):
+                _interp_ut = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u[t, :, :])
+                _interp_vt = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v[t, :, :])
+                _interp_u.append(_interp_ut)
+                _interp_v.append(_interp_vt)
+        else:
+            _interp_u = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u)
+            _interp_v = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v)
+
+    else:
+        VEL = None
+        _interp_u = None
+        _interp_v = None
+    if p.parallelisation is True:
+        VEL = comm.bcast(VEL, root=0)
+        _interp_u = comm.bcast(_interp_u, root=0)
+        _interp_v = comm.bcast(_interp_v, root=0)
+
 
     # - Initialise empty variables and particles
     init = utils.init_empty_variables(p, grid, listTr, size, rank)
     dim_hr, dim_lr, grid_size, reducepart, i0, i1 = init
 
     # - Perform advection
-    list_var_adv = mod_advection.advection(reducepart, VEL, p, i0, i1, listGr,
+    list_var_adv = mod_advection.advection(reducepart, _interp_u, _interp_v, p,
+                                           i0, i1, listGr,
                                            grid, rank=rank, size=size)
     import numpy
     print(dim_hr)
     dim_hr[0] = numpy.shape(list_var_adv['lon_hr'])[0]
     dim_lr[0] = numpy.shape(list_var_adv['lon_lr'])[0]
-    print(dim_hr)
     # - Save output in netcdf file
     if p.parallelisation is True:
         drifter = utils.gather_data_mpi(p, list_var_adv, listGr, listTr,

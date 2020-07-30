@@ -2,6 +2,7 @@ import numpy
 import os
 import sys
 import pyproj
+import datetime
 import lap.utils.read_utils as read_utils
 import lap.utils.write_utils as write_utils
 import lap.mod_tools as mod_tools
@@ -12,6 +13,19 @@ from math import pi
 import logging
 logger = logging.getLogger(__name__)
 
+idf_fmt = '%Y-%m-%dT%H:%M:%S.%fZ'
+global_idf = {'cdm_data_type': 'grid',
+              'idf_version': '1.0',
+              'idf_subsampling_factor': 0,
+              'institution' : 'OceanDataLab',
+              'product_version': '1.0',
+              'Metadata_Conventions': 'Unidata Dataset Discovery V1.0',
+              'standard_name_vocabulary': 'NetCDF Climate and Forecast (CF) Metadata Convention',
+              'creator_name': 'OceanDataLab',
+              'creator_url': 'www.oceandatalab.com',
+              'publisher_email': 'contact@oceandatalab.com',
+              'file_version': '1.0',
+             }
 # #############################
 # #        READ TRACER       ##
 # #############################
@@ -173,7 +187,7 @@ def read_grid_netcdf(p):
     get_regular_tracer(p, Tr, get_coord=True)
     return Tr
 
-def read_grid_tiff(p)
+def read_grid_tiff(p):
     import gdal
     from osgeo import osr
     ds = gdal.Open(p.file_grid)
@@ -428,8 +442,9 @@ def read_velocity(p, get_time=None):
         if p.name_h is not None:
             h[t, :, :] = + VEL.var
     step = numpy.sign(p.tadvection) * p.vel_step
-    stop = p.first_day + int(abs(p.tadvection) + 1) * numpy.sign(p.tadvection)
-    VEL.time = numpy.arange(p.first_day, stop, step)
+    first_day = (p.first_day - p.reference).total_seconds() / 86400
+    stop = first_day + int(abs(p.tadvection) + 1) * numpy.sign(p.tadvection)
+    VEL.time = numpy.arange(first_day, stop, step)
     VEL.u = + u
     VEL.v = + v
     VEL.us = + usave
@@ -499,8 +514,9 @@ def Read_amsr_t(p):
 
 
 def write_drifter(p, drifter, listTr):
-    start = int(p.first_day)
-    stop = int(p.first_day + p.tadvection)
+    start = p.first_day.strftime('%Y%m%d')
+    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    stop = stop.strftime('%Y%m%d')
     file_default = f'Advection_{start}_{stop}_K{p.K}s{p.sigma}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     p.output = getattr(p, 'output', default_output)
@@ -508,19 +524,37 @@ def write_drifter(p, drifter, listTr):
 
 
 def write_diagnostic_2d(p, data, description='', **kwargs):
-    start = int(data['time'][0])
-    stop = int(data['time'][-1])
+    start = p.first_day.strftime('%Y%m%d')
+    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    stop = stop.strftime('%Y%m%d')
     file_default = f'{p.diagnostic[0]}_{start}_{stop}.nc'
     default_output = os.path.join(p.output_dir, file_default)
+    global_attr = global_idf
+    global_attr['time_coverage_start'] = p.first_day.strftime(idf_fmt)
+    _end = p.first_day + datetime.timedelta(days=1)
+    global_attr['time_coverage_end'] = _end.strftime(idf_fmt)
+    global_attr['idf_spatial_resolution'] = p.parameter_grid[5]*111110
+    global_attr['idf_spatial_resolution_units'] = "m"
+    global_attr['id'] = 'fsle_lap'
+    global_attr['idf_granule_id'] = file_default
+    data['lon'] = data['lon'][0, :]
+    data['lat'] = data['lat'][:, 0]
+    print(numpy.shape(data['lon']))
+    _result = compute_gcp(data['lon'], data['lat'],
+                          gcp_lat_spacing=5, gcp_lon_spacing=5)
+    data['lon_gcp'], data['lat_gcp'], data['index_lat_gcp'], data['index_lon_gcp'] = _result
+    print(numpy.shape(data['index_lon_gcp']), data['lat_gcp'])
     p.output = getattr(p, 'output', default_output)
     write_utils.write_velocity(data, p.output, description=description,
                                unit=const.unit, long_name=const.long_name,
+                               meta=global_attr,
                                fill_value=-1e36, **kwargs)
 
 
 def write_advected_tracer(p, data_out):
-    start = int(p.first_day)
-    stop = int(p.first_day + p.tadvection)
+    start = p.first_day.strftime('%Y%m%d')
+    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    stop = stop.strftime('%Y%m%d')
     file_default = f'Advection_{start}_{stop}_K{p.K}s{p.sigma}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     p.output = getattr(p, 'output', default_output)
@@ -532,3 +566,56 @@ def write_params(p, time):
     stime = time.strftime(outformat)
     output = f'params_output_{stime}'
     write_utils.write_params(p, output)
+
+
+def compute_gcp(lon, lat, gcp_lat_spacing=32, gcp_lon_spacing=32):
+
+    # Compute geotransform parameters
+    # A workaround is used here to avoid numerical precision issues in
+    # numpy.mean: if values are too close to 0, underflow errors may arise so
+    # we multiply values by a large factor before passing them to numpy.mean,
+    # then we divide the result by the same factor
+    precision_factor = 10000
+    lon0 = lon[0]
+    _dlon = lon[1:] - lon[:-1]
+    dlon = numpy.mean(precision_factor * _dlon) / precision_factor
+    lat0 = lat[0]
+    _dlat = lat[1:] - lat[:-1]
+    dlat = numpy.mean(precision_factor * _dlat) / precision_factor
+    x0, dxx, dxy, y0, dyx, dyy = [lon0, dlon, 0, lat0, 0, dlat]
+
+    logger.debug(f'Geotransform: {x0} {dxx} {dxy} {y0} {dyx} {dyy}')
+
+    # Compute number of GCPs (except the ones for bottom and right edge)
+    # according to the requested resolution, i.e. the number of digital points
+    # between two GCPs
+    nlat = len(lat)
+    nlon = len(lon)
+    gcp_nlat = numpy.ceil(nlat / gcp_lat_spacing).astype('int')
+    gcp_nlon = numpy.ceil(nlon / gcp_lon_spacing).astype('int')
+
+    logger.debug(f'{nlat}, {nlon}, {gcp_lat_spacing}, {gcp_lon_spacing},'
+                 f'{gcp_nlat}, {gcp_nlon}')
+
+    # Compute matrix indices for the GCPs
+    gcp_lin = numpy.arange(gcp_nlat) * gcp_lat_spacing
+    gcp_pix = numpy.arange(gcp_nlon) * gcp_lon_spacing
+
+    # Add an extra line and column to geolocate the bottom and right edges of
+    # the data matrix
+    gcp_lin = numpy.concatenate((gcp_lin, [nlat]))
+    gcp_pix = numpy.concatenate((gcp_pix, [nlon]))
+
+    # GCP pixels are located at the edge of data pixels, meaning that the
+    # center of the first data pixel is located at (0.5, 0.5) in the GCPs
+    # matrix.
+    x0 = x0 - 0.5 * dxx
+    y0 = y0 - 0.5 * dyy
+
+    # Compute GCP geographical coordinates expressed in lat/lon
+    _gcp_lin = gcp_lin[:, numpy.newaxis]
+    _gcp_pix = gcp_pix[numpy.newaxis, :]
+    gcp_lat = y0 + dyx * _gcp_pix + dyy * _gcp_lin
+    gcp_lon = x0 + dxx * _gcp_pix + dxy * _gcp_lin
+    return gcp_lon[0, :], gcp_lat[:, 0], gcp_lin, gcp_pix
+

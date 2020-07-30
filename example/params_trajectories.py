@@ -16,7 +16,9 @@ output_step = 1.
 # boundary issues).
 box = [280., 350., 10., 60.]
 # First time of advection (in CNES julian days)
-first_day = 20819
+reference = datetime.datetime(1970, 1,1)
+first_day = datetime.datetime(2011,1 , 8) # 20819
+strday = first_day.strftime('%Y%m%d')
 
 # -- Initialize list of tracer for collocation purposes -- ##
 # Provide list of tracer to collocate in time and space along the trajectory
@@ -32,97 +34,18 @@ tracer_filter = (0, 0)
 
 # -- Set up velocity for advection -- ##
 # Path for data
-vel_input_dir = '/mnt/data/project/dimup/AVISO_tmp'
+vel_input_dir = '/mnt/data/'
 # Class of the velocity file to read
 vel_format = 'regular_netcdf'
 # Name of velocity and coordinate variables
-name_lon = 'lon'
-name_lat = 'lat'
-name_u = 'u'
-name_v = 'v'
+name_lon = 'longitude'
+name_lat = 'latitude'
+name_u = 'ugos'
+name_v = 'vgos'
 # List of velocity files to use
-list_vel = [ 'aviso_020819.nc',
-          'aviso_020820.nc',
-          'aviso_020821.nc',
-          'aviso_020822.nc',
-          'aviso_020823.nc',
-          'aviso_020824.nc',
-          'aviso_020825.nc',
-          'aviso_020826.nc',
-          'aviso_020827.nc',
-          'aviso_020828.nc',
-          'aviso_020829.nc',
-          'aviso_020830.nc',
-          'aviso_020831.nc',
-          'aviso_020832.nc',
-          'aviso_020833.nc',
-          'aviso_020834.nc',
-          'aviso_020835.nc',
-          'aviso_020836.nc',
-          'aviso_020837.nc',
-          'aviso_020838.nc',
-          'aviso_020839.nc',
-          'aviso_020840.nc',
-          'aviso_020841.nc',
-          'aviso_020842.nc',
-          'aviso_020843.nc',
-          'aviso_020844.nc',
-          'aviso_020845.nc',
-          'aviso_020846.nc',
-          'aviso_020847.nc',
-          'aviso_020848.nc',
-          'aviso_020849.nc',
-          'aviso_020850.nc',
-          'aviso_020851.nc',
-          'aviso_020852.nc',
-          'aviso_020853.nc',
-          'aviso_020854.nc',
-          'aviso_020855.nc',
-          'aviso_020856.nc',
-          'aviso_020857.nc',
-          'aviso_020858.nc',
-          'aviso_020859.nc',
-          'aviso_020860.nc',
-          'aviso_020861.nc',
-          'aviso_020862.nc',
-          'aviso_020863.nc',
-          'aviso_020864.nc',
-          'aviso_020865.nc',
-          'aviso_020866.nc',
-          'aviso_020867.nc',
-          'aviso_020868.nc',
-          'aviso_020869.nc',
-          'aviso_020870.nc',
-          'aviso_020871.nc',
-          'aviso_020872.nc',
-          'aviso_020873.nc',
-          'aviso_020874.nc',
-          'aviso_020875.nc',
-          'aviso_020876.nc',
-          'aviso_020877.nc',
-          'aviso_020878.nc',
-          'aviso_020879.nc',
-          'aviso_020880.nc',
-          'aviso_020881.nc',
-          'aviso_020882.nc',
-          'aviso_020883.nc',
-          'aviso_020884.nc',
-          'aviso_020885.nc',
-          'aviso_020886.nc',
-          'aviso_020887.nc',
-          'aviso_020888.nc',
-          'aviso_020889.nc',
-          'aviso_020890.nc',
-          'aviso_020891.nc',
-          'aviso_020892.nc',
-          'aviso_020893.nc',
-          'aviso_020894.nc',
-          'aviso_020895.nc',
-          'aviso_020896.nc',
-          'aviso_020897.nc',
-          'aviso_020898.nc',
-          'aviso_020899.nc'
-          ]
+# List of velocity files to use
+list_date = [first_day + datetime.timedelta(x) for x in range(0, tadvection -2, -1)]
+list_vel = [f'dt_global_allsat_phy_l4_{x.strftime("%Y%m%d")}_20190101.nc' for x in list_date]
 # Time step between two velocity files
 vel_step = 1.
 
@@ -130,7 +53,7 @@ vel_step = 1.
 # Time step for advection (in days)
 adv_time_step = 0.11
 # Time length of advection
-tadvection = 79
+tadvection = 30
 # parameters for random walk to simulate diffusion
 scale = 1.
 # Diffusion parameter (sigma = 0.00000035)
@@ -154,12 +77,13 @@ save_S = True
 save_RV = False
 save_OW = False
 # Set output file name and path
-output_dir = '/mnt/data/project/dimup'
+output_dir = '/mnt/data/
 test = 'aviso'
 if stationary is True:
     test = 'aviso_stat'
-start = int(first_day)
-stop = int(first_day + tadvection)
+start = first_day.strftime('%Y%m%d')
+last_day = first_day + datetime.timedelta(tadvection)
+stop = last_day.strftime('%Y%m%d')
 output_file = f'{test}_advection_{start}_{stop}.nc'
 output = os.path.join(output_dir, output_file)
 

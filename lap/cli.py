@@ -55,7 +55,7 @@ def run_lyapunov_script() ->None:
         file_param = str(sys.argv[1])
 
     p = mod_tools.load_python_file(file_param)
-    lyapunov.lyapunov(p)
+    lyapunov.run_lyapunov(p)
 
 def run_lagrangian_script() ->None:
     ''' Compute Lagrangian diagnostics. '''

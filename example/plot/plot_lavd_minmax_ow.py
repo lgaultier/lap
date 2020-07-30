@@ -194,7 +194,7 @@ if '__main__' == __name__:
         plot_cartopy(lon, lat, data, extent, output, lons=max_lon,
                      lats=max_lat, cs_lon=cs_lon, cs_lat=cs_lat)
     if args.ow is not None:
-        thres_ow = 0.08
+        thres_ow = 0.7
         ow_th = threshold_ow(lon2, lat2, ow[0, :, :], extent, thres_ow)
         output = os.path.join(args.output_path,
                               f'ow_min_max_{t}_{file_split}.png')

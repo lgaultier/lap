@@ -24,6 +24,35 @@ import lap.utils.general_utils as utils
 import logging
 logger = logging.getLogger(__name__)
 
+# TODO check code
+def tracer_advection(p, Tr, VEL, AMSRgrid=None):
+    mod_tools.make_default(p)
+    if p.make_grid is False:
+        grid = mod_io.read_grid_netcdf(p)
+    else:
+        grid = mod_io.make_grid(p)
+    # Make a list of particles out of the previous grid
+    utils.make_list_particles(grid)
+    # - Initialise empty variables and particle
+    init = utils.init_empty_variables(p, grid, listTr, size, rank)
+    dim_hr, dim_lr, grid_size, reducepart, i0, i1 = init
+
+    # - Advect particles on each processor
+    list_var_adv = mod_advection.advection(reducepart, VEL, p, i0, i1, listTr,
+                                           grid, rank=rank, size=size)
+
+    # - Save output in netcdf file
+    if p.parallelisation is True:
+        data_out = utils.gather_data_mpi(p, grid, list_var_adv, listGr, listTr,
+                                         dim_lr, dim_hr, comm, rank, size,
+                                         grid_size)
+    else:
+        data_out = utils.gather_data(p, grid, list_var_adv, listGr, listTr)
+
+    if rank == 0:
+        mod_advection.reordering(Tr, data_out, AMSR, p)
+    return data_out
+
 
 def run_tracer_advection(p):
     # - Initialize variables from parameter file
@@ -113,23 +142,3 @@ def run_tracer_advection(p):
         mod_advection.reordering(Tr, data_out, AMSR, p)
         mod_io.write_advected_tracer(p, data_out)
         logger.info(f'End time {datetime.datetime.now()}')
-
-
-# - Gather data in processor 0 and save them
-#  if MPI:
-#    comm.barrier()
-#    newilocal=comm.gather(newi, newi, root=0)
-#    newjlocal=comm.gather(newj, newj, root=0)
-#    if rank==0:
-#        grid.iit[:,:,i0:i1]=newilocal[irank][:,:,:]
-#        grid.ijt[:,:,i0:i1]=newjlocal[irank][:,:,:]
-
-#  else:
-#    print('no MPI')
-#    grid.iit[:,:,:]=newi
-#    grid.ijt[:,:,:]=newj
-#    grid.i=newi
-#    grid.j=newj
-#    #grid.var2=grid.var[grid.i,grid.j]
-#
-#    rw_data.write_cdf2d(output, grid)

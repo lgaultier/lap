@@ -109,8 +109,9 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
             data['time_hr'] = list_var_adv['time_hr']
             del list_var_adv['time_hr']
         tstep = p.tadvection / p.output_step / abs(p.tadvection)
-        tstop = p.first_day + p.tadvection + tstep
-        data['time'] = numpy.arange(p.first_day, tstop, tstep)
+        first_day = ( p.first_day - p.reference).total_seconds() / 86400
+        tstop = first_day + p.tadvection + tstep
+        data['time'] = numpy.arange(first_day, tstop, tstep)
         for irank in range(0, size):
 
             npixel = int((grid_size - 1)/size) + 1
@@ -151,8 +152,9 @@ def gather_data(p, list_var_adv, listGr, listTr):
     for key, value in list_var_adv.items():
         data[key] = list_var_adv[key]
     tstep = p.tadvection / p.output_step / abs(p.tadvection)
-    tstop = p.first_day + p.tadvection + tstep
-    data['time'] = numpy.arange(p.first_day, tstop, tstep)
+    first_day = ( p.first_day - p.reference).total_seconds() / 86400
+    tstop = first_day + p.tadvection + tstep
+    data['time'] = numpy.arange(first_day, tstop, tstep)
     return data
 
 

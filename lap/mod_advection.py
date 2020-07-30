@@ -231,6 +231,45 @@ def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
     latpa = latpa + transportv + inertial_partv + turbulence[1]
     return rcoord, vcoord, dvcoord, lonpa, latpa, mask
 
+def advection_pa_timestep_np(p, lonpa, latpa, t, dt, mask, rk, _interp_u,
+                             _interp_v, sizeadvection):
+
+    #TODO boundary condition
+    # Temporal interpolation  for velocity
+    if type(_interp_u) is list and len(_interp_u)>1:
+        interp_dt = int(dt / p.vel_step)
+        mod_t = numpy.mod(dt, p.vel_step)
+        _interp_ut = (_interp_u[interp_dt](lonpa, latpa) * (p.vel_step - mod_t)
+                      + _interp_u[interp_dt+1](lonpa, latpa) * mod_t) / p.vel_step
+        _interp_vt = (_interp_v[interp_dt](lonpa, latpa) * (p.vel_step - mod_t)
+                      + _interp_v[interp_dt+1](lonpa, latpa) * mod_t) / p.vel_step
+    else:
+        _interp_ut = _interp_u[0](lonpa, latpa)
+        _interp_vt = _interp_v[0](lonpa, latpa)
+    dlondt = numpy.sign(p.tadvection) * _interp_ut
+    dlatdt = numpy.sign(p.tadvection) * _interp_vt
+    # Set velocity to 0 if particle is outside domain
+    #if (rlonu < 0 or rlonu > 1 or rlatu < 0 or rlatu > 1
+    #      or rlonv < 0 or rlonv > 1 or rlatv < 0 or rlatv > 1):
+    #    dlondt = 0
+    #    dlatdt = 0
+    #    mask = 1
+    # Propagate position of particle with velocity
+    deltat = (p.adv_time_step * const.day2sec) # * p.tadvection
+              #/ float(sizeadvection))
+    # compute pure advection transport
+    transportu = dlondt * deltat
+    transportv = dlatdt * deltat
+    # Bera vera motion of a particule with a weight different from sea water
+    fo = numpy.cos(numpy.deg2rad(latpa)) * 2 * const.omega
+    tau = 2 * p.radius_part**2 / (9 * const.visc * p.weight_part)
+    inertial_partu = - tau * (p.weight_part - 1) * fo * dlatdt
+    inertial_partv = tau * (p.weight_part - 1) * fo * dlondt
+    # compute turbulence if there is diffusion
+    turbulence = p.B * rk + p.sigma * rk * deltat
+    lonpa = lonpa + transportu + inertial_partu + turbulence[0]
+    latpa = latpa + transportv + inertial_partv + turbulence[1]
+    return lonpa, latpa, mask
 
 def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
     # # Initialize listGrid and step
@@ -250,6 +289,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
     su = (numpy.shape(VEL.Vlatu)[0], numpy.shape(VEL.Vlonu)[0])
     sv = (numpy.shape(VEL.Vlatv)[0], numpy.shape(VEL.Vlonv)[0])
     # # Loop on particles
+    first_day = (p.first_day - p.reference).total_seconds() / 86400.
     for pa in part:
         # # - Initialize final variables
         lonpa = + grid.lon1d[pa]
@@ -259,7 +299,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
         if p.save_traj is True:
             vlonpa = [lonpa, ]
             vlatpa = [latpa, ]
-            vtime = [p.first_day, ]
+            vtime = [first_day, ]
             vu = [0, ]
             vh = [0, ]
             vv = [0, ]
@@ -314,7 +354,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                     ind_t = 0
                 #while dt < p.output_step:
                 rk = r[:, k]
-                advect = advection_pa_timestep(p, lonpa, latpa, t, dt,
+                advect = advection_pa_timestep_np(p, lonpa, latpa, t, dt,
                                                mask, rk, VEL, vcoord,
                                                dvcoord, (su, sv),
                                                sizeadvection)
@@ -373,7 +413,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 if p.save_traj is True:
                     vlonpa.append(lonpa)
                     vlatpa.append(latpa)
-                    time = (p.first_day + (t * p.output_step)
+                    time = (first_day + (t * p.output_step)
                             * p.tadvection / float(sizeadvection))
                     vtime.append(time)
                     vu.append(ums)
@@ -628,6 +668,7 @@ def reordering(Tr, grid, AMSR, p):
 
 
 def reordering1d(p, listTr, listGr):
+    first_day = (p.first_day - p.reference).total_seconds() / 86400
     if listGr:
         n2, nt, npa = numpy.shape(listGr[0].newi)
         nlist = len(listTr)
@@ -636,7 +677,7 @@ def reordering1d(p, listTr, listGr):
             Tr = listTr[i]
             Gr = listGr[p.listnum[i]]
             for time in range(nt):
-                realtime = (p.first_day + time * numpy.sign(p.tadvection))
+                realtime = (first_day + time * numpy.sign(p.tadvection))
                 tratime = numpy.argmin(abs(Tr.time - realtime))
                 for pa in range(npa):
                     tra[time, pa, i] = Tr.var[tratime,
@@ -652,6 +693,7 @@ def reordering1d(p, listTr, listGr):
 
 def reordering1dmpi(p, listTr, listGr):
     tra = None
+    first_day = (p.first_day - p.reference).total_seconds() / 86400
     if listGr:
         n2, nt, npa = numpy.shape(listGr[0].newi)
         nlist = len(listTr)
@@ -660,7 +702,7 @@ def reordering1dmpi(p, listTr, listGr):
             Tr = listTr[i]
             Gr = listGr[p.listnum[i]]
             for time in range(nt):
-                realtime = (p.first_day + time * numpy.sign(p.tadvection))
+                realtime = (first_day + time * numpy.sign(p.tadvection))
                 tratime = numpy.argmin(abs(Tr.time - realtime))
                 for pa in range(npa):
                     tra[time, pa, i] = Tr.var[tratime,

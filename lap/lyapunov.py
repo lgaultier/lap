@@ -1,5 +1,6 @@
 import datetime
 import numpy
+import scipy
 import sys
 import lap.mod_advection as mod_advection
 import lap.mod_tools as mod_tools
@@ -20,11 +21,11 @@ def init_particles(plon, plat, dx):
     return npa_lon, npa_lat
 
 
-def advection(p, npa_lon, npa_lat, VEL, store=True):
+def advection(p, npa_lon, npa_lat, VEL, interpu, interpv, store=True):
     num_pa = numpy.shape(npa_lon)
-    su = numpy.shape(VEL.u)
-    sv = numpy.shape(VEL.v)
-    svel = [su, sv]
+    #su = numpy.shape(VEL.u)
+    #sv = numpy.shape(VEL.v)
+    #svel = [su, sv]
     # npa_lon_end = numpy.empty(num_pa)
     # npa_lat_end = numpy.empty(num_pa)
     mask = 0
@@ -35,35 +36,36 @@ def advection(p, npa_lon, npa_lat, VEL, store=True):
         if store is True:
             npa_lon[i] = []
             npa_lat[i] = []
-        init = mod_advection.init_velocity(VEL, lonpa, latpa, su, sv)
-        iu, ju, iv, jv, dvcoord = init
-        [dVlatu, dVlatv, dVlonu, dVlonv] = dvcoord
-        vcoord = [iu, ju, iv, jv]
+        #init = mod_advection.init_velocity(VEL, lonpa, latpa, su, sv)
+        #iu, ju, iv, jv, dvcoord = init
+        #[dVlatu, dVlatv, dVlonu, dVlonv] = dvcoord
+        #vcoord = [iu, ju, iv, jv]
         dt = 0
         sizeadvection = p.tadvection / p.adv_time_step
         while dt < abs(p.tadvection):
             # # TODO: retrieve index t in velocity
-            advect = mod_advection.advection_pa_timestep(p, lonpa, latpa,
+            #advect = mod_advection.advection_pa_timestep(p, lonpa, latpa,
+            #                                             int(dt), dt,
+            #                                             mask, r, VEL,
+            #                                             vcoord, dvcoord, svel,
+            #                                             sizeadvection)
+            advect = mod_advection.advection_pa_timestep_np(p, lonpa, latpa,
                                                          int(dt), dt,
-                                                         mask, r, VEL,
-                                                         vcoord, dvcoord, svel,
+                                                         mask, r, interpu, interpv,
                                                          sizeadvection)
-            rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
+            #rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
+            lonpa, latpa, mask = advect
             dt += p.adv_time_step
             if store is True:
                 npa_lon[i].append(lonpa)
                 npa_lat[i].append(latpa)
         if store is False:
-            npa_lon[i] = lonpa
-            npa_lat[i] = latpa
+            npa_lon[i] = + lonpa
+            npa_lat[i] = + latpa
     return npa_lon, npa_lat, mask
 
 
 def deform_pa(npa_lon, npa_lat, dx):
-    # Compute deformation matrix
-    #    mata(1,:) = xip1j(:) - xim1j(:)
-    #      mata(2,:) = xijp1(:) - xijm1(:)
-    #        mata(:,:) = mata(:,:) * factor
     deform = numpy.zeros((2, 2))
     deform[0, 0] = npa_lon[1] - npa_lon[0]
     deform[0, 1] = npa_lat[1] - npa_lat[0]
@@ -142,8 +144,13 @@ def fsle_pa(lon, lat, df, d0, dt, tf):
     fsle = numpy.log(lmax) / tau
     return fsle, 0, 0
 
+def run_lyapunov(p):
+    mod_tools.make_default(p)
+    logger.info('Loading Velocity')
+    VEL = mod_io.read_velocity(p)
+    lyapunov(p, VEL)
 
-def lyapunov(p):
+def lyapunov(p, VEL):
     # - Initialize variables from parameter file
     # ------------------------------------------
     mod_tools.make_default(p)
@@ -179,8 +186,26 @@ def lyapunov(p):
 
     # Read velocity
     if rank == 0:
-        logger.info('Loading Velocity')
-    VEL = mod_io.read_velocity(p)
+        if len(numpy.shape(VEL.u)) > 2:
+            _interp_u = []
+            _interp_v = []
+            for t in range(numpy.shape(VEL.u)[0]):
+                _interp_ut = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u[t, :, :])
+                _interp_vt = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v[t, :, :])
+                _interp_u.append(_interp_ut)
+                _interp_v.append(_interp_vt)
+        else:
+            _interp_u = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u)
+            _interp_v = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v)
+
+    else:
+        VEL = None
+        _interp_u = None
+        _interp_v = None
+    if p.parallelisation is True:
+        VEL = comm.bcast(VEL, root=0)
+        _interp_u = comm.bcast(_interp_u, root=0)
+        _interp_v = comm.bcast(_interp_v, root=0)
 
     # For each point in Grid
     grid_size = numpy.shape(grid.lon1d)[0]
@@ -192,12 +217,14 @@ def lyapunov(p):
     all_lambda = []
     all_mask = []
     data_r = {}
+
     for pa in reducepart:
         lonpa = grid.lon1d[pa]
         latpa = grid.lat1d[pa]
         # advect four points around position
-        npalon, npalat = init_particles(lonpa, latpa, p.delta0)
-        npalon, npalat, mask = advection(p, npalon, npalat, VEL, store=store)
+        _npalon, _npalat = init_particles(lonpa, latpa, p.delta0)
+        npalon, npalat, mask = advection(p, _npalon, _npalat, VEL, _interp_u,
+                                         _interp_v, store=store)
         if pa % 100 == 0:
             perc = float(pa - i0) / float(len(reducepart))
             mod_tools.update_progress(perc, str(pa), str(rank))
@@ -226,7 +253,8 @@ def lyapunov(p):
         data['lon2'] = grid.lon1d.reshape(shape_grid)
         data['lat2'] = grid.lat1d.reshape(shape_grid)
         data['lat'] = grid.lat
-        data['time'] = numpy.array([p.first_day, ])
+        _date = (p.first_day - p.reference).total_seconds() / 86400
+        data['time'] = numpy.array([_date, ])
         if isFSLE is True:
             description = ("Finite-Size Lyapunov Exponent computed using"
                            "lap_toolbox")
@@ -236,5 +264,6 @@ def lyapunov(p):
             description = ("Finite-Time Lyapunov Exponent computed using"
                            "lap_toolbox")
             mod_io.write_diagnostic_2d(p, data, description=description,
-                                       FTLE=data[name_var], time=data['time'], lon2=data['lon2'], lat2=data['lat2'])
+                                       FTLE=data[name_var], time=data['time'],
+                                       lon2=data['lon2'], lat2=data['lat2'])
         logger.info(f'Stop time {datetime.datetime.now()}')
