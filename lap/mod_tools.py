@@ -80,6 +80,7 @@ def make_default(p):
     # misc
     p.parallelisation = getattr(p, 'parallelisation', False)
     p.factor = 180.0 / (pi * const.Rearth)
+    p.out_pattern = getattr(p, 'out_pattern', 'Lap_output')
     return None
 
 

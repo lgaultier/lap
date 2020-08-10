@@ -183,7 +183,9 @@ def read_list_grid(p, dict_tracer):
 
 
 def read_grid_netcdf(p):
-    Tr = read_utils.MODISCDF(file=p.fileg, var=p.name_tracer, time='time')
+    # # TODO, lon= ... lat= ...
+    Tr = read_utils.read_tracer(filename=p.fileg, var=p.name_tracer,
+                                time='time')
     get_regular_tracer(p, Tr, get_coord=True)
     return Tr
 
@@ -527,7 +529,7 @@ def write_diagnostic_2d(p, data, description='', **kwargs):
     start = p.first_day.strftime('%Y%m%d')
     stop = p.first_day + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
-    file_default = f'{p.diagnostic[0]}_{start}_{stop}.nc'
+    file_default = f'{p.out_pattern}_{start}_{stop}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     global_attr = global_idf
     global_attr['time_coverage_start'] = p.first_day.strftime(idf_fmt)
@@ -535,11 +537,10 @@ def write_diagnostic_2d(p, data, description='', **kwargs):
     global_attr['time_coverage_end'] = _end.strftime(idf_fmt)
     global_attr['idf_spatial_resolution'] = p.parameter_grid[5]*111110
     global_attr['idf_spatial_resolution_units'] = "m"
-    global_attr['id'] = 'fsle_lap'
+    global_attr['id'] = f'{p.out_pattern}'
     global_attr['idf_granule_id'] = file_default
     data['lon'] = data['lon'][0, :]
     data['lat'] = data['lat'][:, 0]
-    print(numpy.shape(data['lon']))
     _result = compute_gcp(data['lon'], data['lat'],
                           gcp_lat_spacing=5, gcp_lon_spacing=5)
     data['lon_gcp'], data['lat_gcp'], data['index_lat_gcp'], data['index_lon_gcp'] = _result
