@@ -1,16 +1,16 @@
 import os
 import datetime
 import numpy
-import lap.mod_tools as mod_tools
+import lap.utils.tools as tools
 import lap.utils.write_utils as write_utils
 import lap.mod_io as mod_io
 import logging
 logger = logging.getLogger(__name__)
 
 
-def compute_eulerian_diags(p):
+def compute_eulerian_diags(p) -> None:
     logger.info(f'Start time {datetime.datetime.now()}')
-    mod_tools.make_default(p)
+    tools.make_default(p)
 
     # - Read velocity
     logger.info('Loading Velocity')

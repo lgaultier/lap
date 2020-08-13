@@ -17,28 +17,27 @@
 '''
 
 import datetime
-import lap.mod_tools as mod_tools
+import numpy
+import lap.utils.tools as tools
 import lap.mod_io as mod_io
 import lap.mod_advection as mod_advection
 import lap.utils.general_utils as utils
+import lap.utils.read_utils as uread
 import logging
 logger = logging.getLogger(__name__)
 
-def drifter(p, VEL, grid=None):
-    mod_tools.make_default(p)
-    if p.make_grid is False:
-        grid = mod_io.read_grid_tiff(p)
-    else:
-        grid = mod_io.make_grid(p)
-    # Make a list of particles out of the previous grid
-    utils.make_list_particles(grid)
+
+def run_drifter(p) -> None:
+    tools.make_default(p)
+    logger.info('Loading Velocity')
+    VEL = mod_io.read_velocity(p)
+    _ = drifter(p, VEL, save_netcdf=True)
 
 
-
-def run_drifter(p):
+def drifter(p, VEL, save_netcdf=False) -> dict:
     # - Initialize variables from parameter file
     # ------------------------------------------
-    mod_tools.make_default(p)
+    tools.make_default(p)
     comm = None
     p.parallelisation, size, rank, comm = utils.init_mpi(p.parallelisation)
 
@@ -57,7 +56,7 @@ def run_drifter(p):
 
         # - Read tracer to collocate
         if p.list_tracer is not None:
-            dict_tracer = mod_tools.available_tracer_collocation()
+            dict_tracer = tools.available_tracer_collocation()
             logger.info('Loading tracer')
             listTr = list(mod_io.read_list_tracer(p, dict_tracer))
             logger.info('Loading tracer grid')
@@ -75,41 +74,22 @@ def run_drifter(p):
         listGr = comm.bcast(listGr, root=0)
 
     # - Read velocity
+    dic_vel = None
     if rank == 0:
         logger.info('Loading Velocity')
-	VEL = mod_io.read_velocity(p)
-        if len(numpy.shape(VEL.u)) > 2:
-            _interp_u = []
-            _interp_v = []
-            for t in range(numpy.shape(VEL.u)[0]):
-                _interp_ut = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u[t, :, :])
-                _interp_vt = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v[t, :, :])
-                _interp_u.append(_interp_ut)
-                _interp_v.append(_interp_vt)
-        else:
-            _interp_u = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u)
-            _interp_v = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v)
-
-    else:
-        VEL = None
-        _interp_u = None
-        _interp_v = None
+        dic_vel = uread.interp_vel(VEL, save_s=p.save_S, save_ow=p.save_OW,
+                                   save_rv=p.save_RV)
     if p.parallelisation is True:
-        VEL = comm.bcast(VEL, root=0)
-        _interp_u = comm.bcast(_interp_u, root=0)
-        _interp_v = comm.bcast(_interp_v, root=0)
-
+        dic_vel = comm.bcast(dic_vel, root=0)
 
     # - Initialise empty variables and particles
     init = utils.init_empty_variables(p, grid, listTr, size, rank)
     dim_hr, dim_lr, grid_size, reducepart, i0, i1 = init
 
     # - Perform advection
-    list_var_adv = mod_advection.advection(reducepart, _interp_u, _interp_v, p,
+    list_var_adv = mod_advection.advection(reducepart, dic_vel, p,
                                            i0, i1, listGr,
                                            grid, rank=rank, size=size)
-    import numpy
-    print(dim_hr)
     dim_hr[0] = numpy.shape(list_var_adv['lon_hr'])[0]
     dim_lr[0] = numpy.shape(list_var_adv['lon_lr'])[0]
     # - Save output in netcdf file
@@ -121,7 +101,9 @@ def run_drifter(p):
         drifter = utils.gather_data(p, list_var_adv, listGr, listTr)
 
     if rank == 0:
-        mod_io.write_drifter(p, drifter, listTr)
+        if save_netcdf is True:
+            mod_io.write_drifter(p, drifter, listTr)
         end_time = datetime.datetime.now()
         logger.info(f'End time {end_time}')
         mod_io.write_params(p, end_time)
+        return drifter

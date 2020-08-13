@@ -17,7 +17,7 @@
 '''
 
 import datetime
-import lap.mod_tools as mod_tools
+import lap.utils.tools as tools
 import lap.mod_io as mod_io
 import lap.mod_advection as mod_advection
 import lap.utils.general_utils as utils
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # TODO check code
 def tracer_advection(p, Tr, VEL, AMSRgrid=None):
-    mod_tools.make_default(p)
+    tools.make_default(p)
     if p.make_grid is False:
         grid = mod_io.read_grid_netcdf(p)
     else:
@@ -57,7 +57,7 @@ def tracer_advection(p, Tr, VEL, AMSRgrid=None):
 def run_tracer_advection(p):
     # - Initialize variables from parameter file
     # ------------------------------------------
-    mod_tools.make_default(p)
+    tools.make_default(p)
     comm = None
     listTr = None
     listGr = None
@@ -91,18 +91,32 @@ def run_tracer_advection(p):
         # else:
         # 'Umknown type of grid, please choose between CDF, AMSR or make'
         # - Read initial tracer
-        if p.tracer_type == 'netcdf':
-            Tr = mod_io.Read_tracer_hr(p)
-        elif p.tracer_type == 'AMSR':
-            Tr = mod_io.Read_amsr(p)
-        elif p.tracer_type == 'MODIS':
-            j0 = 7900
-            j1 = 8150
-            i0 = 1250
-            i1 = 1550
-            Tr = mod_io.Read_modis_hr(p, i0, i1, j0, j1)
-        elif p.tracer_type == 'MODEL':
-            Tr = mod_io.Read_tracer_model(p)
+
+
+        # #TODO Adapt with read_list_tracer
+        # - Read tracer to collocate
+        if p.list_tracer is not None:
+            dict_tracer = tools.available_tracer_collocation()
+            logger.info('Loading tracer')
+            listTr = list(mod_io.read_list_tracer(p, dict_tracer))
+            logger.info('Loading tracer grid')
+            listGr = list(mod_io.read_list_grid(p, dict_tracer))
+        else:
+            listTr = None
+            listGr = None
+
+        # if p.tracer_type == 'netcdf':
+        #     Tr = mod_io.Read_tracer_hr(p)
+        # elif p.tracer_type == 'AMSR':
+        #     Tr = mod_io.Read_amsr(p)
+        # elif p.tracer_type == 'MODIS':
+        #     j0 = 7900
+        #     j1 = 8150
+        #     i0 = 1250
+        #     i1 = 1550
+        #     Tr = mod_io.Read_modis_hr(p, i0, i1, j0, j1)
+        # elif p.tracer_type == 'MODEL':
+        #     Tr = mod_io.Read_tracer_model(p)
     else:
         Tr = None
     if p.parallelisation is True:

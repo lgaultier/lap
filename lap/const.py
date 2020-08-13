@@ -11,7 +11,8 @@ omega = 7.2921*10**(-4)
 
 # - UNITS AND NAME
 unit = {"U": "m/s", "V": "m/s", "T": "degC", "lambda": "/days", "lon": "deg E",
-        "lat": "deg N", "time": "seconds since 1970-01-01T00:00:00.000000Z", "FSLE": "1/day", "FTLE": "1/day",
+        "lat": "deg N", "time": "seconds since 1970-01-01T00:00:00.000000Z",
+        "FSLE": "1/day", "FTLE": "1/day",
         "lat_hr": "deg N", "lon_hr": "deg E", "lat_lr": "deg N",
         "lon_lr": "deg E", "time_hr": "day", }
 long_name = {"U": "zonal velocity",

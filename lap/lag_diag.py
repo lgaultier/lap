@@ -2,7 +2,7 @@ import datetime
 import numpy
 import lap.utils.read_utils as read_utils
 import lap.mod_io as mod_io
-import lap.mod_tools as mod_tools
+import lap.utils.tools as tools
 import logging
 logger = logging.getLogger(__name__)
 
@@ -31,16 +31,13 @@ def compute_lavd(p, plon, plat, ptime, pvort, mean_vort, t0=0):
     ntime, npa = numpy.shape(plon)
     lavd = numpy.zeros((ntime - t0, npa))
     lavd_time = numpy.zeros((ntime - t0))
-    ntime_vel = numpy.shape(mean_vort)[0]
-    #mean_vort = numpy.mean(pvort, axis=2)
-    tini = t0 + 1
     tvel = numpy.arange(0, numpy.shape(mean_vort)[0])
     tpa = numpy.arange(0, ntime)
 
     mvort_t = numpy.interp(tpa, tvel, mean_vort)
     for t in range(ntime - t0 - 2):
         tf = t + t0 + 2
-        index_f = min(int(tf * p.adv_time_step / p.vel_step), ntime_vel - 2)
+        # index_f = min(int(tf * p.adv_time_step / p.vel_step), ntime_vel - 2)
         lavd_tmp = numpy.sum(numpy.abs(pvort[t0 + 1: tf, :]
                              - mvort_t[t0 + 1: tf, numpy.newaxis]),
                              axis=0)
@@ -54,7 +51,7 @@ def compute_lavd(p, plon, plat, ptime, pvort, mean_vort, t0=0):
 
 def lagrangian_diag(p):
     logger.info(f'Start time {datetime.datetime.now()}')
-    mod_tools.make_default(p)
+    tools.make_default(p)
     list_var = ['lon_hr', 'lat_hr', 'time_hr', 'zonal_velocity',
                 'meridional_velocity', 'Vorticity']
     t0 = 0
@@ -76,9 +73,9 @@ def lagrangian_diag(p):
         metx_2d = numpy.empty((num_t - t0, shape_grid[0], shape_grid[1]))
         mety_2d = numpy.empty((num_t - t0, shape_grid[0], shape_grid[1]))
         for t in range(t0 + 1, num_t):
-            #metx_all = []
-            #mety_all = []
-            #for pa in range(num_pa):
+            # metx_all = []
+            # mety_all = []
+            # for pa in range(num_pa):
             #    metx, mety = compute_mets(plon[t0: t, pa], plat[t0: t, pa])
             #    metx_all.append(metx)
             #    mety_all.append(mety)
@@ -95,9 +92,9 @@ def lagrangian_diag(p):
                              shape_grid[1]))
         yt0_2d = numpy.zeros((numpy.shape(yt0)[0], shape_grid[0],
                              shape_grid[1]))
-        mezic_strain = numpy.zeros((numpy.shape(yt0)[0], shape_grid[0],
-                                   shape_grid[1]))
-        for t in range(numpy.shape(lavd)[0]):
+        # mezic_strain = numpy.zeros((numpy.shape(yt0)[0], shape_grid[0],
+        #                            shape_grid[1]))
+        for t in range(numpy.shape(xt0)[0]):
             xt0_2d[t, :, :] = numpy.array(xt0[t, :]).reshape()
             yt0_2d[t, :, :] = numpy.array(yt0[t, :]).reshape()
             # mezic_strain[t, :, :] = det(
@@ -122,9 +119,10 @@ def lagrangian_diag(p):
         logger.info('compute lavd')
         try:
             lavd, lavd_t = compute_lavd(p, plon, plat, ptime, pvort, mean_vort,
-                                    t0=t0)
+                                        t0=t0)
         except:
-            import pdb ; pdb.set_trace()
+            import pdb
+            pdb.set_trace()
         lavd_2d = numpy.zeros((numpy.shape(lavd)[0], shape_grid[0],
                                shape_grid[1]))
         for t in range(numpy.shape(lavd)[0]):
@@ -133,9 +131,8 @@ def lagrangian_diag(p):
         lavd_2d = numpy.empty(shape_grid)
     time = numpy.arange(t0, (numpy.shape(lavd_2d)[0] + 1) * p.adv_time_step-1,
                         p.adv_time_step)
-    print(numpy.shape(time), numpy.shape(metx_2d), numpy.shape(lavd_2d))
     logger.info('Write data')
-    data={}
+    data = {}
     data['lon'] = grid.lon
     data['lat'] = grid.lat
     data['time'] = time
