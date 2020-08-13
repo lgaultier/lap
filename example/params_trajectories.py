@@ -1,4 +1,6 @@
 import os
+import datetime
+
 # -- Initialisation parameters -- ##
 # Parallelisation 
 parallelisation = True
@@ -8,6 +10,8 @@ make_grid = True
 # [lonleft, lon_right, lon_step, lat_bottom, lat_top, lat_step]
 #parameter_grid = (289.,309., 0.04,32.0, 42.375, 0.04)
 parameter_grid = (300., 310., 0.25, 37., 42., 0.25)
+parameter_grid = (17., 35., 0.04, -43, -33, 0.04)
+
 # If make_grid is True, specify parameters to build grid
 # Define time output step (in days) for tracer
 output_step = 1.
@@ -15,10 +19,27 @@ output_step = 1.
 # relevant area (box must be one degree bigger that area of interst to avoid
 # boundary issues).
 box = [280., 350., 10., 60.]
+box = [10., 50., -50., -20.]
+
 # First time of advection (in CNES julian days)
 reference = datetime.datetime(1970, 1,1)
 first_day = datetime.datetime(2011,1 , 8) # 20819
 strday = first_day.strftime('%Y%m%d')
+
+## -- ADVECTION PARAMETER -- ## 
+# Time step for advection (in days)
+adv_time_step = 0.11
+# Time length of advection
+tadvection = 25
+# parameters for random walk to simulate diffusion
+scale = 1.
+# Diffusion parameter (sigma = 0.00000035)
+sigma = 0
+K = 0
+# Diffusion and source and sink using low resolution tracer information
+gamma = 0.
+# Stationary flow: True or False
+stationary = True #False
 
 # -- Initialize list of tracer for collocation purposes -- ##
 # Provide list of tracer to collocate in time and space along the trajectory
@@ -34,7 +55,7 @@ tracer_filter = (0, 0)
 
 # -- Set up velocity for advection -- ##
 # Path for data
-vel_input_dir = '/mnt/data/'
+vel_input_dir = '/mnt/data/satellite/l4'
 # Class of the velocity file to read
 vel_format = 'regular_netcdf'
 # Name of velocity and coordinate variables
@@ -44,25 +65,11 @@ name_u = 'ugos'
 name_v = 'vgos'
 # List of velocity files to use
 # List of velocity files to use
-list_date = [first_day + datetime.timedelta(x) for x in range(0, tadvection -2, -1)]
+list_date = [first_day + datetime.timedelta(x) for x in range(0, tadvection + 3, 1)]
+print(len(list_date))
 list_vel = [f'dt_global_allsat_phy_l4_{x.strftime("%Y%m%d")}_20190101.nc' for x in list_date]
 # Time step between two velocity files
 vel_step = 1.
-
-## -- ADVECTION PARAMETER -- ## 
-# Time step for advection (in days)
-adv_time_step = 0.11
-# Time length of advection
-tadvection = 30
-# parameters for random walk to simulate diffusion
-scale = 1.
-# Diffusion parameter (sigma = 0.00000035)
-sigma = 0
-K = 0
-# Diffusion and source and sink using low resolution tracer information
-gamma = 0.
-# Stationary flow: True or False
-stationary = False
 
 # -- OUTPUTS -- ##
 # Set value for nan
@@ -73,11 +80,11 @@ save_traj = True
 save_U = True
 save_V = True
 # Save diagnostic parameters
-save_S = True
+save_S = False
 save_RV = False
 save_OW = False
 # Set output file name and path
-output_dir = '/mnt/data/
+output_dir = '/mnt/data/'
 test = 'aviso'
 if stationary is True:
     test = 'aviso_stat'
