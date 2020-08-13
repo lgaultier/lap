@@ -1,37 +1,25 @@
 import numpy
 import os
 import sys
-import pyproj
 import datetime
 import lap.utils.read_utils as read_utils
 import lap.utils.write_utils as write_utils
-import lap.mod_tools as mod_tools
+import lap.utils.tools as tools
 import lap.const as const
+import lap.utils.idf as idf_io
 from scipy.ndimage import filters
 from scipy import interpolate
 from math import pi
 import logging
 logger = logging.getLogger(__name__)
 
-idf_fmt = '%Y-%m-%dT%H:%M:%S.%fZ'
-global_idf = {'cdm_data_type': 'grid',
-              'idf_version': '1.0',
-              'idf_subsampling_factor': 0,
-              'institution' : 'OceanDataLab',
-              'product_version': '1.0',
-              'Metadata_Conventions': 'Unidata Dataset Discovery V1.0',
-              'standard_name_vocabulary': 'NetCDF Climate and Forecast (CF) Metadata Convention',
-              'creator_name': 'OceanDataLab',
-              'creator_url': 'www.oceandatalab.com',
-              'publisher_email': 'contact@oceandatalab.com',
-              'file_version': '1.0',
-             }
 # #############################
 # #        READ TRACER       ##
 # #############################
 
 
 def get_regular_tracer(p, tracer, get_coord=True):
+    ''' Get indices and mask values out of tracer and extract area '''
     tracer.read_var()
     if get_coord is True:
         tracer.read_coord()
@@ -79,7 +67,7 @@ def read_tracer_netcdf(p):
     return Tr
 
 
-def read_list_tracer(p, dict_tracer):
+def read_list_tracer(p, dict_tracer: dict) -> list:
     listTr = []
     tref = p.tref
     # Loop on all tracer provided in the parameter file
@@ -88,7 +76,7 @@ def read_list_tracer(p, dict_tracer):
         i = 0
         tref = p.first_day
         # For each tracer Find first available data
-        year, month, day = mod_tools.jj2date(tref)
+        year, month, day = tools.jj2date(tref)
         tra_name = dict_tracer['name'][tra]
         tra_step = dict_tracer['tstep'][tra]
         tra_dir = dict_tracer['dir'][tra]
@@ -99,7 +87,7 @@ def read_list_tracer(p, dict_tracer):
         while ((not os.path.exists(pathfilet))
                 and abs(tref - p.first_day) <= tra_step):
             tref -= 1
-            year, month, day = mod_tools.jj2date(tref)
+            year, month, day = tools.jj2date(tref)
             filet = f'{tra_name}{year:02d}{month:02d}{day:02d}.nc'
         # If no data is found in the previous step, there is no available data
         if abs(tref - p.first_day) > tra_step:
@@ -112,7 +100,7 @@ def read_list_tracer(p, dict_tracer):
         num_date = len(listdate)
         # Read all necessary time steps
         for jdate in listdate:
-            year, month, day = mod_tools.jj2date(jdate)
+            year, month, day = tools.jj2date(jdate)
             filet = f'{tra_name}{year:02d}{month:02d}{day:02d}.nc'
             pathfilet = os.path.join(p.DIR, tra_dir, filet)
             Tr = read_utils.tracer_netcdf(filename=pathfilet, var=tra_var,
@@ -140,7 +128,7 @@ def read_list_tracer(p, dict_tracer):
     return listTr
 
 
-def read_list_grid(p, dict_tracer):
+def read_list_grid(p, dict_tracer: dict) -> list:
     listTr = []
     tref = p.first_day
     # Loop on all tracer grid provided in the parameter file
@@ -148,7 +136,7 @@ def read_list_grid(p, dict_tracer):
         logger.info(f'Reading {tra}')
         jdate = tref
         # For each tracer Find first available data
-        year, month, day = mod_tools.jj2date(jdate)
+        year, month, day = tools.jj2date(jdate)
         tra_name = dict_tracer['name'][tra]
         tra_step = dict_tracer['tstep'][tra]
         tra_dir = dict_tracer['dir'][tra]
@@ -159,7 +147,7 @@ def read_list_grid(p, dict_tracer):
         while (not os.path.exists(pathfilet)
                and abs(jdate - p.first_day) <= tra_step):
             jdate -= 1
-            year, month, day = mod_tools.jj2date(jdate)
+            year, month, day = tools.jj2date(jdate)
             filet = f'{tra_name}{year:04d}{month:02d}{day:02d}.nc'
             pathfilet = os.path.join(p.DIR, tra_dir, filet)
         # If no data is found in the previous step, there is no available data
@@ -189,17 +177,19 @@ def read_grid_netcdf(p):
     get_regular_tracer(p, Tr, get_coord=True)
     return Tr
 
-def read_grid_tiff(p):
+
+'''
+# TODO is it used?
+def read_grid_tiff(p, Tr):
     import gdal
-    from osgeo import osr
     ds = gdal.Open(p.file_grid)
     band = ds.GetRasterBand(1)
     arr = band.ReadAsArray()
     xoff, a, b, yoff, d, e = ds.GetGeoTransform()
     x = numpy.arange(ds.RasterXSize)
     y = numpy.arange(ds.RasterYSize)
-    x = numpy.array([x,]*ds.RasterYSize)
-    y = numpy.array([y,]*ds.RasterXSize).transpose()
+    x = numpy.array([x, ]*ds.RasterYSize)
+    y = numpy.array([y, ]*ds.RasterXSize).transpose()
     xp = numpy.zeros(numpy.shape(x))
     yp = numpy.zeros(numpy.shape(y))
     xp = a * x + b * y + xoff
@@ -209,13 +199,14 @@ def read_grid_tiff(p):
     Tr.var = arr[arr > 0]
     mask = numpy.isnan(Tr.var)
     return Tr
+'''
 
 
 # TODO is it used?
-def Read_listgrid_netcdf(p, dict_tracer, jdate):
+def Read_listgrid_netcdf(p, dict_tracer: dict, jdate: float) -> list:
     listTr = []
     for tra in p.list_grid:
-        year, month, day = mod_tools.jj2date(jdate)
+        year, month, day = tools.jj2date(jdate)
         tra_name = dict_tracer['name'][tra]
         tra_dir = dict_tracer['dir'][tra]
         tra_var = dict_tracer['var'][tra]
@@ -283,9 +274,10 @@ def make_mask(p):
 
 
 def make_grid(p):
-    try:
+    _coord = list(p.parameter_grid)
+    if len(_coord) == 6:
         lon0, lon1, dlon, lat0, lat1, dlat = list(p.parameter_grid)
-    except:
+    else:
         logger.error('Grid parameters must be specified in parameter_grid '
                      '(lon0, lon1, dlon, lat0, lat1, dlat)')
         sys.exit(1)
@@ -300,7 +292,7 @@ def make_grid(p):
     shape_tra = numpy.shape(Tr.lon)
     masktmp = masktmp.reshape(shape_tra)
     # TODO create real mask
-    #masktmp = numpy.ones(shape_tra)
+    # masktmp = numpy.ones(shape_tra)
     Tr.mask = (masktmp > 0)
     return Tr
 
@@ -337,7 +329,7 @@ def read_velocity(p, get_time=None):
     if p.stationary is True:
         num_steps = 1
     else:
-        num_steps = int(abs(p.tadvection) / p.vel_step) + 1
+        num_steps = int(abs(p.tadvection) / p.vel_step) + 2
     shape_vel_u = (num_steps, numpy.shape(lat2du)[0],
                    numpy.shape(lon2du)[1])
     shape_vel_v = (num_steps, numpy.shape(lat2dv)[0],
@@ -351,9 +343,9 @@ def read_velocity(p, get_time=None):
     Ss = numpy.zeros(shape_vel_u)
     RV = numpy.zeros(shape_vel_u)
     for t in range(0, num_steps):
-        if num_steps !=1:
+        if num_steps != 1:
             perc = float(t / (num_steps - 1))
-            mod_tools.update_progress(perc, '', '')
+            tools.update_progress(perc, '', '')
         filename = os.path.join(p.vel_input_dir, p.list_vel[t])
         if not os.path.isfile(filename):
             logger.error(f'File {filename} not found')
@@ -389,38 +381,26 @@ def read_velocity(p, get_time=None):
         # # TODO A CHANGER , Initialize u and v here
         # VEL.masku=numpy.ma.masked_where(VEL.varu), VEL.varu[numpy.isnan(
         # VEL.varu) and (abs(VEL.varu)>10) and (abs(VEL.varv)>10)]
-        # VEL.varu *=1.3
-        # VEL.varv *=1.3
         mask = (numpy.ma.getmaskarray(VEL.varu)
                 | numpy.ma.getmaskarray(VEL.varv)
-                | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv) # )
+                | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv)
                 | (VEL.varu == p.missing_value)
                 | (VEL.varv == p.missing_value))
         # VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
         # VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
         if p.name_h is not None:
             VEL.var[numpy.where(abs(VEL.var) > 100)] = numpy.nan
-        #utmp, vtmp = mod_tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
-        geod = pyproj.Geod(ellps='WGS84')
-        #  pyproj.Geod.fwd expects bearings to be clockwise angles from north
-        # (in degrees
-        azim = numpy.pi / 2. - numpy.arctan2(VEL.varv, VEL.varu)
-        dist1s = numpy.sqrt(VEL.varu**2 + VEL.varv**2)
-        lon180 = numpy.mod(lon2du + 180, 360) - 180
-        lonend, latend, _ = geod.fwd(lon180, lat2du, numpy.rad2deg(azim),
-                                     dist1s, radians=False)
-        # lonend = numpy.mod(lonend, 360)
-        utmp = lonend - lon180
-        vtmp = latend - lat2du
+        # utmp, vtmp = tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
+        # TODO separate function to convert m/s in deg/day
+        utmp, vtmp = tools.ms2degd(lon2du, lat2du, VEL.varu, VEL.varv)
         VEL.varu[mask] = 0
         VEL.varv[mask] = 0
         utmp[mask] = 0
         vtmp[mask] = 0
 
-        #utmp = VEL.varu /(111.10**3 * numpy.cos(numpy.deg2rad(lat2du)))
-        #vtmp = VEL.varv / 111.10**3
-
         # Compute Strain Relative Vorticity and Okubo Weiss
+        # TODO Create separate  function
+
         if p.save_S or p.save_RV or p.save_OW:
             gfo = (9.81 / numpy.cos(numpy.mean((lat2du + lat2dv)/2)*pi/180.)
                    / (2 * const.omega))
@@ -443,6 +423,8 @@ def read_velocity(p, get_time=None):
         vsave[t, :, :] = + VEL.varv
         if p.name_h is not None:
             h[t, :, :] = + VEL.var
+    # if p.save_S or p.save_RV or p.save_OW:
+    #    compute_strain_vort
     step = numpy.sign(p.tadvection) * p.vel_step
     first_day = (p.first_day - p.reference).total_seconds() / 86400
     stop = first_day + int(abs(p.tadvection) + 1) * numpy.sign(p.tadvection)
@@ -515,12 +497,14 @@ def Read_amsr_t(p):
 # ###########################
 
 
-def write_drifter(p, drifter, listTr):
+def write_drifter(p, drifter, listTr, idf=False):
     start = p.first_day.strftime('%Y%m%d')
     stop = p.first_day + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
     file_default = f'Advection_{start}_{stop}_K{p.K}s{p.sigma}.nc'
     default_output = os.path.join(p.output_dir, file_default)
+    global_attr = idf_io.global_idf
+    global_attr['time_coverage_start'] = p.first_day.strftime(idf_io.idf_fmt)
     p.output = getattr(p, 'output', default_output)
     write_utils.write_listracer_1d(p.output, drifter, p, listTr)
 
@@ -531,20 +515,20 @@ def write_diagnostic_2d(p, data, description='', **kwargs):
     stop = stop.strftime('%Y%m%d')
     file_default = f'{p.out_pattern}_{start}_{stop}.nc'
     default_output = os.path.join(p.output_dir, file_default)
-    global_attr = global_idf
-    global_attr['time_coverage_start'] = p.first_day.strftime(idf_fmt)
+    global_attr = idf_io.global_idf
+    global_attr['time_coverage_start'] = p.first_day.strftime(idf_io.idf_fmt)
     _end = p.first_day + datetime.timedelta(days=1)
-    global_attr['time_coverage_end'] = _end.strftime(idf_fmt)
+    global_attr['time_coverage_end'] = _end.strftime(idf_io.idf_fmt)
     global_attr['idf_spatial_resolution'] = p.parameter_grid[5]*111110
     global_attr['idf_spatial_resolution_units'] = "m"
     global_attr['id'] = f'{p.out_pattern}'
     global_attr['idf_granule_id'] = file_default
     data['lon'] = data['lon'][0, :]
     data['lat'] = data['lat'][:, 0]
-    _result = compute_gcp(data['lon'], data['lat'],
-                          gcp_lat_spacing=5, gcp_lon_spacing=5)
+    _result = idf_io.compute_gcp(data['lon'], data['lat'],
+                                 gcp_lat_spacing=5, gcp_lon_spacing=5)
+
     data['lon_gcp'], data['lat_gcp'], data['index_lat_gcp'], data['index_lon_gcp'] = _result
-    print(numpy.shape(data['index_lon_gcp']), data['lat_gcp'])
     p.output = getattr(p, 'output', default_output)
     write_utils.write_velocity(data, p.output, description=description,
                                unit=const.unit, long_name=const.long_name,
@@ -567,56 +551,3 @@ def write_params(p, time):
     stime = time.strftime(outformat)
     output = f'params_output_{stime}'
     write_utils.write_params(p, output)
-
-
-def compute_gcp(lon, lat, gcp_lat_spacing=32, gcp_lon_spacing=32):
-
-    # Compute geotransform parameters
-    # A workaround is used here to avoid numerical precision issues in
-    # numpy.mean: if values are too close to 0, underflow errors may arise so
-    # we multiply values by a large factor before passing them to numpy.mean,
-    # then we divide the result by the same factor
-    precision_factor = 10000
-    lon0 = lon[0]
-    _dlon = lon[1:] - lon[:-1]
-    dlon = numpy.mean(precision_factor * _dlon) / precision_factor
-    lat0 = lat[0]
-    _dlat = lat[1:] - lat[:-1]
-    dlat = numpy.mean(precision_factor * _dlat) / precision_factor
-    x0, dxx, dxy, y0, dyx, dyy = [lon0, dlon, 0, lat0, 0, dlat]
-
-    logger.debug(f'Geotransform: {x0} {dxx} {dxy} {y0} {dyx} {dyy}')
-
-    # Compute number of GCPs (except the ones for bottom and right edge)
-    # according to the requested resolution, i.e. the number of digital points
-    # between two GCPs
-    nlat = len(lat)
-    nlon = len(lon)
-    gcp_nlat = numpy.ceil(nlat / gcp_lat_spacing).astype('int')
-    gcp_nlon = numpy.ceil(nlon / gcp_lon_spacing).astype('int')
-
-    logger.debug(f'{nlat}, {nlon}, {gcp_lat_spacing}, {gcp_lon_spacing},'
-                 f'{gcp_nlat}, {gcp_nlon}')
-
-    # Compute matrix indices for the GCPs
-    gcp_lin = numpy.arange(gcp_nlat) * gcp_lat_spacing
-    gcp_pix = numpy.arange(gcp_nlon) * gcp_lon_spacing
-
-    # Add an extra line and column to geolocate the bottom and right edges of
-    # the data matrix
-    gcp_lin = numpy.concatenate((gcp_lin, [nlat]))
-    gcp_pix = numpy.concatenate((gcp_pix, [nlon]))
-
-    # GCP pixels are located at the edge of data pixels, meaning that the
-    # center of the first data pixel is located at (0.5, 0.5) in the GCPs
-    # matrix.
-    x0 = x0 - 0.5 * dxx
-    y0 = y0 - 0.5 * dyy
-
-    # Compute GCP geographical coordinates expressed in lat/lon
-    _gcp_lin = gcp_lin[:, numpy.newaxis]
-    _gcp_pix = gcp_pix[numpy.newaxis, :]
-    gcp_lat = y0 + dyx * _gcp_pix + dyy * _gcp_lin
-    gcp_lon = x0 + dxx * _gcp_pix + dxy * _gcp_lin
-    return gcp_lon[0, :], gcp_lat[:, 0], gcp_lin, gcp_pix
-

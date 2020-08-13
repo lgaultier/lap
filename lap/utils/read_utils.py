@@ -8,6 +8,7 @@ Classes are:
 import sys
 import netCDF4
 import numpy
+import scipy
 from scipy.ndimage import filters
 from scipy.interpolate import griddata
 import logging
@@ -414,3 +415,45 @@ def read_trajectory(infile, list_var):
             logger.warn(f'variable {key} not found in file {infile}')
     fid.close()
     return dict_var
+
+
+def interp_vel(VEL, save_s=False, save_ow=False, save_rv=False,) -> dict:
+    interp2d = scipy.interpolate.interp2d
+    _inte_u = None
+    _inte_v = None
+    _inte_h = None
+    _inte_sn = None
+    _inte_ss = None
+    _inte_rv = None
+    if len(numpy.shape(VEL.u)) > 2:
+        _inte_u = []
+        _inte_v = []
+        _inte_h = []
+        _inte_sn = []
+        _inte_ss = []
+        _inte_rv = []
+        for t in range(numpy.shape(VEL.u)[0]):
+            _inte_u.append(interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u[t, :, :]))
+            _inte_v.append(interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v[t, :, :]))
+            _inte_h.append(interp2d(VEL.Vlonu, VEL.Vlatv, VEL.h[t, :, :]))
+            if save_s is True or save_ow is True:
+                _inte_sn.append(interp2d(VEL.Vlonu, VEL.Vlatv,
+                                         VEL.Sn[t, :, :]))
+                _inte_ss.append(interp2d(VEL.Vlonu, VEL.Vlatv,
+                                         VEL.Ss[t, :, :]))
+            if save_rv is True or save_ow is True:
+                _inte_rv.append(interp2d(VEL.Vlonu, VEL.Vlatv,
+                                         VEL.RV[t, :, :]))
+    else:
+        _inte_u = list([interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u), ])
+        _inte_v = list([interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v), ])
+        _inte_h = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.h), ])
+        if save_s is True or save_ow is True:
+            _inte_sn = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.Sn), ])
+            _inte_ss = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.Ss), ])
+        if save_rv is True or save_ow is True:
+            _inte_rv = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.RV), ])
+
+    dic_interp = {'u': _inte_u, 'v': _inte_v, 'h': _inte_h,
+                  'sn': _inte_sn, 'ss': _inte_ss, 'rv': _inte_rv}
+    return dic_interp

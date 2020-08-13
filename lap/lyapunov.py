@@ -1,17 +1,17 @@
 import datetime
+from typing import Optional, Tuple
 import numpy
-import scipy
 import sys
 import lap.mod_advection as mod_advection
-import lap.mod_tools as mod_tools
+import lap.utils.tools as tools
 import lap.mod_io as mod_io
 import lap.utils.general_utils as utils
-import lap.const as const
 import logging
 logger = logging.getLogger(__name__)
 
 
-def init_particles(plon, plat, dx):
+def init_particles(plon: float, plat: float, dx: float
+                   ) -> Tuple[numpy.ndarray, numpy.ndarray]:
     lonp = plon + dx
     lonm = plon - dx
     latp = plat + dx
@@ -21,13 +21,10 @@ def init_particles(plon, plat, dx):
     return npa_lon, npa_lat
 
 
-def advection(p, npa_lon, npa_lat, VEL, interpu, interpv, store=True):
+def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
+              store: Optional[bool] = True
+              ) -> Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
     num_pa = numpy.shape(npa_lon)
-    #su = numpy.shape(VEL.u)
-    #sv = numpy.shape(VEL.v)
-    #svel = [su, sv]
-    # npa_lon_end = numpy.empty(num_pa)
-    # npa_lat_end = numpy.empty(num_pa)
     mask = 0
     r = numpy.zeros((2, 1))
     for i in range(num_pa[0]):
@@ -36,24 +33,12 @@ def advection(p, npa_lon, npa_lat, VEL, interpu, interpv, store=True):
         if store is True:
             npa_lon[i] = []
             npa_lat[i] = []
-        #init = mod_advection.init_velocity(VEL, lonpa, latpa, su, sv)
-        #iu, ju, iv, jv, dvcoord = init
-        #[dVlatu, dVlatv, dVlonu, dVlonv] = dvcoord
-        #vcoord = [iu, ju, iv, jv]
         dt = 0
-        sizeadvection = p.tadvection / p.adv_time_step
         while dt < abs(p.tadvection):
             # # TODO: retrieve index t in velocity
-            #advect = mod_advection.advection_pa_timestep(p, lonpa, latpa,
-            #                                             int(dt), dt,
-            #                                             mask, r, VEL,
-            #                                             vcoord, dvcoord, svel,
-            #                                             sizeadvection)
-            advect = mod_advection.advection_pa_timestep_np(p, lonpa, latpa,
-                                                         int(dt), dt,
-                                                         mask, r, interpu, interpv,
-                                                         sizeadvection)
-            #rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
+            _adv = mod_advection.advection_pa_timestep_np
+            advect = _adv(p, lonpa, latpa, dt, mask, r,
+                          dic_vel['u'], dic_vel['v'])
             lonpa, latpa, mask = advect
             dt += p.adv_time_step
             if store is True:
@@ -65,7 +50,8 @@ def advection(p, npa_lon, npa_lat, VEL, interpu, interpv, store=True):
     return npa_lon, npa_lat, mask
 
 
-def deform_pa(npa_lon, npa_lat, dx):
+def deform_pa(npa_lon: numpy.ndarray, npa_lat: numpy.ndarray, dx: float
+              ) -> Tuple[float, numpy.ndarray, numpy.ndarray]:
     deform = numpy.zeros((2, 2))
     deform[0, 0] = npa_lon[1] - npa_lon[0]
     deform[0, 1] = npa_lat[1] - npa_lat[0]
@@ -83,7 +69,7 @@ def deform_pa(npa_lon, npa_lat, dx):
     dl = numpy.sqrt(lmean * lmean - lprod)
     l1 = lmean + dl
     l2 = lmean - dl
-    #l1, l2 = numpy.linalg.eigvals(jacob)
+    # l1, l2 = numpy.linalg.eigvals(jacob)
     lmax = numpy.sqrt(max(abs(l1), abs(l2)))
     v1, v2 = numpy.linalg.eig(jacob)
 
@@ -101,7 +87,8 @@ def deform_pa(npa_lon, npa_lat, dx):
     return lmax, v1, v2
 
 
-def ftle_pa(lon, lat, df, d0, dt, tf):
+def ftle_pa(lon: numpy.ndarray, lat: numpy.ndarray, df:float, d0: float,
+            dt:float, tf: float) -> Tuple[float, numpy.ndarray, numpy.ndarray]:
     # Compute eigenvalues and vector
     lmax, v1, v2 = deform_pa(lon, lat, d0)
     # Compute FTLE
@@ -109,11 +96,12 @@ def ftle_pa(lon, lat, df, d0, dt, tf):
     return ftle, v1, v2
 
 
-def fsle_pa(lon, lat, df, d0, dt, tf):
+def fsle_pa(lon: numpy.ndarray, lat: numpy.ndarray, df: float, d0: float,
+            dt: float, tf: float) -> Tuple[float, float, float]:
     haversine = False
     if haversine is True:
-        dx1 = mod_tools.haversine(lon[1][:], lon[0][:], lat[1][:], lat[0][:])
-        dx2 = mod_tools.haversine(lon[3][:], lon[3][:], lat[3][:], lat[2][:])
+        dx1 = tools.haversine(lon[1][:], lon[0][:], lat[1][:], lat[0][:])
+        dx2 = tools.haversine(lon[3][:], lon[3][:], lat[3][:], lat[2][:])
     else:
         dlon1 = numpy.array(lon[1][:]) - numpy.array(lon[0][:])
         dlat1 = numpy.array(lat[1][:]) - numpy.array(lat[0][:])
@@ -144,16 +132,18 @@ def fsle_pa(lon, lat, df, d0, dt, tf):
     fsle = numpy.log(lmax) / tau
     return fsle, 0, 0
 
+
 def run_lyapunov(p):
-    mod_tools.make_default(p)
+    tools.make_default(p)
     logger.info('Loading Velocity')
     VEL = mod_io.read_velocity(p)
     lyapunov(p, VEL)
 
+
 def lyapunov(p, VEL):
     # - Initialize variables from parameter file
     # ------------------------------------------
-    mod_tools.make_default(p)
+    tools.make_default(p)
     comm = None
     p.parallelisation, size, rank, comm = utils.init_mpi(p.parallelisation)
     if rank == 0:
@@ -185,33 +175,17 @@ def lyapunov(p, VEL):
         grid = comm.bcast(grid, root=0)
 
     # Read velocity
+    dic_vel = None
     if rank == 0:
-        if len(numpy.shape(VEL.u)) > 2:
-            _interp_u = []
-            _interp_v = []
-            for t in range(numpy.shape(VEL.u)[0]):
-                _interp_ut = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u[t, :, :])
-                _interp_vt = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v[t, :, :])
-                _interp_u.append(_interp_ut)
-                _interp_v.append(_interp_vt)
-        else:
-            _interp_u = scipy.interpolate.interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u)
-            _interp_v = scipy.interpolate.interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v)
-
-    else:
-        VEL = None
-        _interp_u = None
-        _interp_v = None
+        dic_vel = utils.interp_vel(VEL)
     if p.parallelisation is True:
         VEL = comm.bcast(VEL, root=0)
-        _interp_u = comm.bcast(_interp_u, root=0)
-        _interp_v = comm.bcast(_interp_v, root=0)
+        dic_vel = comm.bcast(dic_vel, root=0)
 
     # For each point in Grid
     grid_size = numpy.shape(grid.lon1d)[0]
     dim = (grid_size, )
     grid.fsle = numpy.zeros(dim)
-    num_pa = numpy.shape(grid.lon1d)
     init = utils.init_empty_variables(p, grid, None, size, rank)
     _, _, grid_size, reducepart, i0, i1 = init
     all_lambda = []
@@ -223,11 +197,12 @@ def lyapunov(p, VEL):
         latpa = grid.lat1d[pa]
         # advect four points around position
         _npalon, _npalat = init_particles(lonpa, latpa, p.delta0)
-        npalon, npalat, mask = advection(p, _npalon, _npalat, VEL, _interp_u,
-                                         _interp_v, store=store)
+        npalon, npalat, mask = advection(p, _npalon, _npalat, dic_vel['u'],
+                                         dic_vel['v'],
+                                         store=store)
         if pa % 100 == 0:
             perc = float(pa - i0) / float(len(reducepart))
-            mod_tools.update_progress(perc, str(pa), str(rank))
+            tools.update_progress(perc, str(pa), str(rank))
 
         # Compute FTLE
         vlambda, _, _ = method(npalon, npalat, p.deltaf, p.delta0,

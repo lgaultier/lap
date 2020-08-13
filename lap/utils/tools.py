@@ -1,4 +1,6 @@
 import sys
+from typing import Tuple
+import pyproj
 import os
 from math import sqrt, pi
 import lap.const as const
@@ -7,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def load_python_file(file_path):
+def load_python_file(file_path: str):
     """Load a file and parse it as a Python module."""
     if not os.path.exists(file_path):
         raise IOError('File not found: {}'.format(file_path))
@@ -84,7 +86,7 @@ def make_default(p):
     return None
 
 
-def update_progress(progress, arg1, arg2):
+def update_progress(progress: float, arg1: str, arg2: str) -> None:
     barLength = 30  # Modify this to change the length of the progress bar
     status = ""
     if isinstance(progress, int):
@@ -100,34 +102,36 @@ def update_progress(progress, arg1, arg2):
         status = "Done...\r\n"
     block = int(round(barLength * progress))
     if arg1 and arg2:
-        text = "\rPercent: [{0}] {1}%, {2}, {3}".format("#"*block + "-"*(barLength - block), "%.2f" % (progress*100), arg1 + ', ' + arg2, status)
+        _arg2 = f'{arg1}, {arg2}'
     elif arg1:
-        text = "\rPercent: [{0}] {1}%, {2}, {3}".format("#"*block + "-"*(barLength - block), "%.2f" % (progress*100), arg1, status)
+        _arg2 = arg1
     else:
-        text = "\rPercent: [{0}] {1}%, {2} ".format("#"*block + "-"*(barLength - block), "%.2f" % (progress*100), status)
+        _arg2 = ''
+    _arg0 = "#"*block + "-"*(barLength - block)
+    _arg1 = "%.2f" % (progress*100)
+    text = f"\rPercent: [{_arg0}] {_arg1}%, {_arg2}, {status}"
     sys.stdout.write(text)
     sys.stdout.flush()
 
 
-def lin_1Dinterp(a, delta):
+def lin_1Dinterp(a: numpy.ndarray, delta: float) -> float:
     if len(a) > 1:
         y = a[0]*(1 - delta) + a[1] * delta
     elif len(a) == 1:
         y = a[0]
     else:
         raise Exception('empty array in 1d interpolation.')
-        #sys.exit(1)
     return y
 
 
-def lin_2Dinterp(a, delta1, delta2):
+def lin_2Dinterp(a: numpy.ndarray, delta1: float, delta2: float) -> float:
     x = lin_1Dinterp(a[0, :], delta1)
     y = lin_1Dinterp(a[1, :], delta1)
     z = lin_1Dinterp([x, y], delta2)
     return z
 
 
-def bissextile(year):
+def bissextile(year: int) -> int:
     biss = 0
     if numpy.mod(year, 400) == 0:
         biss = 1
@@ -136,7 +140,7 @@ def bissextile(year):
     return biss
 
 
-def dinm(year, month):
+def dinm(year: int, month: int) -> int:
     if month > 12:
         logger.error("wrong month in dinm")
         sys.exit(1)
@@ -153,7 +157,7 @@ def dinm(year, month):
     return daysinmonth
 
 
-def jj2date(sjday):
+def jj2date(sjday: int) -> Tuple[int, int, int]:
     #  sys.exit("to be written")
     jday = int(sjday)
     year = 1950
@@ -172,11 +176,12 @@ def jj2date(sjday):
     return year, month, day
 
 
-def haversine(lon1, lon2, lat1, lat2):
-    lon1 = numpydeg2rad(lon1)
-    lon2 = numpydeg2rad(lon2)
-    lat1 = numpydeg2rad(lat1)
-    lat2 = numpydeg2rad(lat2)
+def haversine(lon1: numpy.ndarray, lon2: numpy.ndarray, lat1: numpy.ndarray,
+              lat2: numpy.ndarray) -> numpy.ndarray:
+    lon1 = numpy.deg2rad(lon1)
+    lon2 = numpy.deg2rad(lon2)
+    lat1 = numpy.deg2rad(lat1)
+    lat2 = numpy.deg2rad(lat2)
     havlat = numpy.sin((lat2 - lat1) / 2)**2
     havlon = numpy.cos(lat1) * numpy.cos(lat2)
     havlon = havlon * numpy.sin((lon2 - lon1) / 2)**2
@@ -184,10 +189,10 @@ def haversine(lon1, lon2, lat1, lat2):
     return d
 
 
-def available_tracer_collocation():
+def available_tracer_collocation() -> dict:
     dict_tracer = {}
     dict_tracer['var'] = {'ostia': 'sst', 'cbpm': 'npp', 'SMOS': 'sss',
-                          'SMOSL4': 'sss', 'SMOSL4_wind': 'wind\ speed',
+                          'SMOSL4': 'sss', 'SMOSL4_wind': 'wind speed',
                           'SMOSL4_MLD': 'MLD', 'SMOSL4_sst': 'sst',
                           'SMOSL4_evapo': 'evaporation',
                           'SMOSL4_precip': 'precipitation', 'MODIS': 'SST',
@@ -220,7 +225,8 @@ def available_tracer_collocation():
     return dict_tracer
 
 
-def convert(x, y, u, v):
+def convert(x: numpy.ndarray, y: numpy.ndarray, u: numpy.ndarray,
+            v: numpy.ndarray) -> Tuple[numpy.ndarray, numpy.ndarray]:
     """
     Convert U V components from metric to angular system units
     """
@@ -271,7 +277,8 @@ def convert(x, y, u, v):
     return numpy.mod(dx + 180.,  360.) - 180., dy
 
 
-def convert1d(x, y, u, v):
+def convert1d(x: numpy.ndarray, y: numpy.ndarray, u: numpy.ndarray,
+              v: numpy.ndarray) -> Tuple[numpy.ndarray, numpy.ndarray]:
     """
     Convert U V components from metric to angular system units
     """
@@ -308,3 +315,19 @@ def convert1d(x, y, u, v):
 
     # Return the velocity in degrees/s
     return (dx + 180) % 360 - 180, dy
+
+
+def ms2degd(lon: numpy.ndarray, lat: numpy.ndarray, u: numpy.ndarray,
+            v: numpy.ndarray) -> Tuple[numpy.ndarray, numpy.ndarray]:
+    ''' Conversion from m/s to deg/timestep '''
+    geod = pyproj.Geod(ellps='WGS84')
+    #  pyproj.Geod.fwd expects bearings to be clockwise angles from north
+    # (in degrees)
+    azim = numpy.pi / 2. - numpy.arctan2(v, u)
+    dist1s = numpy.sqrt(u**2 + v**2)
+    lon180 = numpy.mod(lon + 180, 360) - 180
+    lonend, latend, _ = geod.fwd(lon180, lat, numpy.rad2deg(azim), dist1s,
+                                 radians=False)
+    uout = lonend - lon180
+    vout = latend - lat
+    return uout, vout

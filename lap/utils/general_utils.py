@@ -5,7 +5,8 @@ logger = logging.getLogger(__name__)
 
 
 # - Initialization
-def init_mpi(isMPI):
+def init_mpi(isMPI: bool):
+    ''' Initialize mpi variables '''
     if isMPI is True:
         try:
             from mpi4py import MPI
@@ -78,7 +79,7 @@ def init_empty_variables(p, grid, listTr, size, rank):
 
 
 def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
-                    comm, rank, size, grid_size):
+                    comm, rank, size, grid_size) -> dict:
 
     # Define local empty variables with the correct size
     if p.list_tracer is not None:
@@ -109,7 +110,7 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
             data['time_hr'] = list_var_adv['time_hr']
             del list_var_adv['time_hr']
         tstep = p.tadvection / p.output_step / abs(p.tadvection)
-        first_day = ( p.first_day - p.reference).total_seconds() / 86400
+        first_day = (p.first_day - p.reference).total_seconds() / 86400
         tstop = first_day + p.tadvection + tstep
         data['time'] = numpy.arange(first_day, tstop, tstep)
         for irank in range(0, size):
@@ -128,10 +129,11 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
                 if ndim == 1:
                     data[key][i0:i1] = local[key][irank][:]
                 elif ndim == 2:
-                    try:
+                    _shape_loc = numpy.shape(local[key][irank])
+                    if _shape_loc[1] == numpy.shape(data[key][:, i0:i1])[1]:
                         data[key][:, i0:i1] = local[key][irank][:, :]
-                    except:
-                        logger.info(f'{key} has dimension {numpy.shape(local[key][irank])}')
+                    else:
+                        logger.info(f'{key} has dimension {_shape_loc}')
                 else:
                     logger.error(f'Wrong dimension for variable {key}: {ndim}')
             if p.list_tracer is not None:
@@ -144,7 +146,7 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
         return data
 
 
-def gather_data(p, list_var_adv, listGr, listTr):
+def gather_data(p, list_var_adv, listGr, listTr) -> dict:
     logger.info('No parallelisation')
     if listTr is not None:
         mod_advection.reordering1d(p, listTr, listGr)
@@ -152,13 +154,13 @@ def gather_data(p, list_var_adv, listGr, listTr):
     for key, value in list_var_adv.items():
         data[key] = list_var_adv[key]
     tstep = p.tadvection / p.output_step / abs(p.tadvection)
-    first_day = ( p.first_day - p.reference).total_seconds() / 86400
+    first_day = (p.first_day - p.reference).total_seconds() / 86400
     tstop = first_day + p.tadvection + tstep
     data['time'] = numpy.arange(first_day, tstop, tstep)
     return data
 
 
-def make_list_particles(grid):
+def make_list_particles(grid) -> None:
     grid.lon1d = + grid.lon.ravel()
     grid.lat1d = + grid.lat.ravel()
     grid.mask1d = + grid.mask.ravel()

@@ -1,11 +1,13 @@
 import numpy
+from typing import Optional, Tuple
 from scipy.stats import norm
 import math
 import lap.const as const
-import lap.mod_tools as mod_tools
+import lap.utils.tools as tools
 
 
-def init_random_walk(sizeadvection, time_step, scale):
+def init_random_walk(sizeadvection: int, time_step: float, scale: float
+                     ) -> Tuple[numpy.ndarray, numpy.ndarray]:
     ''' Intialize random coefficient if a random walk scheme is used to
     simulate diffusion. '''
     r = numpy.zeros((3, int(sizeadvection / time_step) + 1))
@@ -16,95 +18,8 @@ def init_random_walk(sizeadvection, time_step, scale):
     return r, rt
 
 
-def init_velocity(VEL, lonpa, latpa, su, sv):
-    '''Initialize particule position in velocity matrix.'''
-    iu = numpy.argmin(abs(VEL.Vlatu - latpa))
-    iv = numpy.argmin(abs(VEL.Vlatv - latpa))
-    ju = numpy.argmin(abs(VEL.Vlonu - lonpa))
-    jv = numpy.argmin(abs(VEL.Vlonv - lonpa))
-    if (iv + 1) >= sv[0]:
-        dVlatv = VEL.Vlatv[iv] - VEL.Vlatv[iv - 1]
-    else:
-        dVlatv = VEL.Vlatv[iv + 1] - VEL.Vlatv[iv]
-    if (iu + 1) >= su[0]:
-        dVlatu = VEL.Vlatu[iu] - VEL.Vlatu[iu - 1]
-    else:
-        dVlatu = VEL.Vlatu[iu + 1] - VEL.Vlatu[iu]
-    if (ju + 1) >= su[1]:
-        dVlonu = VEL.Vlonu[ju] - VEL.Vlonu[ju - 1]
-    else:
-        dVlonu = VEL.Vlonu[ju + 1] - VEL.Vlonu[ju]
-    if (jv + 1) >= sv[1]:
-        dVlonv = VEL.Vlonv[jv] - VEL.Vlonv[jv - 1]
-    else:
-        dVlonv = VEL.Vlonv[jv + 1] - VEL.Vlonv[jv]
-    # index_vel = (iu, ju, iv, jv)
-    dvcoord = [dVlatu, dVlatv, dVlonu, dVlonv]
-    return iu, ju, iv, jv, dvcoord
-
-
-def interpol_intime(arr, t, index_vel, interp_dt, su):
-    '''Extract 4 neighbors and interpolate in time between two time steps'''
-    iu, ju = index_vel
-    result = numpy.zeros((2, 2))
-    slice_t = slice(int(t), int(t + 2))
-    try:
-        result[0, 0] = mod_tools.lin_1Dinterp(arr[slice_t, iu, ju], interp_dt)
-        result[0, 1] = mod_tools.lin_1Dinterp(arr[slice_t, iu, min(ju + 1,
-                                                  su[1] - 1)], interp_dt)
-        result[1, 0] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1,
-                                              su[0] - 1), ju], interp_dt)
-        result[1, 1] = mod_tools.lin_1Dinterp(arr[slice_t, min(iu + 1, su[0] - 1),
-                                              min(ju + 1, su[1] - 1)], interp_dt)
-    except:
-        logger.error('issue on interpolation in time')
-    return result
-
-
-def no_interpol_intime(arr, index_vel, su):
-    '''Extract 4 neighbors, no interpolation in time (used for
-    stationary fields).'''
-    iu, ju = index_vel
-    result = numpy.zeros((2, 2))
-    result[0, 0] = arr[0, iu, ju]
-    result[0, 1] = arr[0, iu, min(ju + 1, su[1] - 1)]
-    result[1, 0] = arr[0, min(iu + 1, su[0] - 1), ju]
-    result[1, 1] = arr[0, min(iu + 1, su[0] - 1), min(ju + 1, su[1] - 1)]
-    return result
-
-
-def dist_topoints(lon, lat, lonpa, latpa, dvcoord, index, su):
-    '''Interpolate linearly the velocity between two grid points'''
-    iu, ju = index
-    dVlon, dVlat = dvcoord
-    rlon = (lonpa - lon[ju]) / (dVlon)
-    rlat = (latpa - lat[iu]) / (dVlat)
-    while rlat > 1. and iu < (su[0] - 1):
-        iu = min(iu + 1, su[0] - 1)
-        if (iu + 1) >= su[0]:
-            dVlat = lat[iu] - lat[iu - 1]
-        else:
-            dVlat = lat[iu + 1] - lat[iu]
-        rlat = (latpa - lat[iu]) / (dVlat)
-    while rlat < 0. and iu > 0:
-        iu = max(iu - 1, 0)
-        dVlat = lat[iu + 1] - lat[iu]
-        rlat = (latpa - lat[iu]) / (dVlat)
-    while rlon > 1. and ju < (su[1] - 1):
-        ju = min(ju + 1, su[1] - 1)
-        if (ju + 1) >= su[1]:
-            dVlon = lon[ju] - lon[ju - 1]
-        else:
-            dVlon = lon[ju + 1] - lon[ju]
-        rlon = (lonpa - lon[ju]) / (dVlon)
-    while rlon < 0 and ju > 0:
-        ju = max(ju - 1, 0)
-        dVlon = lon[ju + 1] - lon[ju]
-        rlon = (lonpa - lon[ju]) / (dVlon)
-    return rlon, rlat, iu, ju, dVlon, dVlat
-
-
-def find_indice_tracer(listGr, newlon, newlat, timetmp, num_pa):
+def find_indice_tracer(listGr: list, newlon: float, newlat: float,
+                       timetmp: int, num_pa: int) -> None:
     '''find indices corresponding to position of particle at time t'''
     for Trac in listGr:
         newi0 = Trac.newi0
@@ -145,7 +60,7 @@ def find_indice_tracer(listGr, newlon, newlat, timetmp, num_pa):
     return None
 
 
-def init_full_traj(p, s0, s1):
+def init_full_traj(p, s0: int, s1: int):
     shape = (s0, s1)
     lon_hr = numpy.zeros(shape)
     lat_hr = numpy.zeros(shape)
@@ -177,86 +92,37 @@ def init_full_traj(p, s0, s1):
     return lon_hr, lat_hr, mask_hr, S_hr, RV_hr, OW_hr, u_hr, v_hr, h_hr
 
 
-def advection_pa_timestep(p, lonpa, latpa, t, dt, mask, rk, VEL, vcoord, dv,
-                          svel, sizeadvection):
-    dVlonu, dVlatu, dVlonv, dVlatv = dv
-    iu, ju, iv, jv = vcoord
-    su, sv = svel
-    # Temporal interpolation  for velocity
-    interp_dt = dt / p.vel_step
-    # if p.stationary is False:
-    #    VEL.ut = interpol_intime(VEL.u, t, [iu, ju], interp_dt, su)
-    #    VEL.vt = interpol_intime(VEL.v, t, [iv, jv], interp_dt, sv)
-    # else:
-    #    VEL.ut = no_interpol_intime(VEL.u, [iu, ju], su)
-    #    VEL.vt = no_interpol_intime(VEL.v, [iv, jv], sv)
-    # 2D Spatial interpolation for velocity
-    dist = dist_topoints(VEL.Vlonu, VEL.Vlatu, lonpa, latpa,
-                         [dVlonu, dVlatu], [iu, ju], su)
-    rlonu, rlatu, iu, ju, dVlonu, dVlatu = dist
-    dist = dist_topoints(VEL.Vlonv, VEL.Vlatv, lonpa, latpa,
-                         [dVlonv, dVlatv], [iv, jv], sv)
-    rlonv, rlatv, iv, jv, dVlonv, dVlatv = dist
-    if p.stationary is False:
-        VEL.ut = interpol_intime(VEL.u, t / p.vel_step, [iu, ju], interp_dt, su)
-        VEL.vt = interpol_intime(VEL.v, t / p.vel_step, [iv, jv], interp_dt, sv)
-    else:
-        VEL.ut = no_interpol_intime(VEL.u, [iu, ju], su)
-        VEL.vt = no_interpol_intime(VEL.v, [iv, jv], sv)
-    dlondt = mod_tools.lin_2Dinterp(VEL.ut, rlonu, rlatu)
-    dlatdt = mod_tools.lin_2Dinterp(VEL.vt, rlonv, rlatv)
-    # Set velocity to 0 if particle is outside domain
-    if (rlonu < 0 or rlonu > 1 or rlatu < 0 or rlatu > 1
-          or rlonv < 0 or rlonv > 1 or rlatv < 0 or rlatv > 1):
-        dlondt = 0
-        dlatdt = 0
-        mask = 1
-    rcoord = [rlonu, rlatu, rlonv, rlatv]
-    vcoord = [iu, ju, iv, jv]
-    dvcoord = [dVlonu, dVlatu, dVlonv, dVlatv]
-    # Propagate position of particle with velocity
-    deltat = (p.adv_time_step * const.day2sec) # * p.tadvection
-              #/ float(sizeadvection))
-    # compute pure advection transport
-    transportu = dlondt * deltat
-    transportv = dlatdt * deltat
-    # Bera vera motion of a particule with a weight different from sea water
-    fo = numpy.cos(numpy.deg2rad(latpa)) * 2 * const.omega
-    tau = 2 * p.radius_part**2 / (9 * const.visc * p.weight_part)
-    inertial_partu = - tau * (p.weight_part - 1) * fo * dlatdt
-    inertial_partv = tau * (p.weight_part - 1) * fo * dlondt
-    # compute turbulence if there is diffusion
-    turbulence = p.B * rk + p.sigma * rk * deltat
-    lonpa = lonpa + transportu + inertial_partu + turbulence[0]
-    latpa = latpa + transportv + inertial_partv + turbulence[1]
-    return rcoord, vcoord, dvcoord, lonpa, latpa, mask
+def advection_pa_timestep_np(p, lonpa: float, latpa: float, dt: float,
+                             mask: float, rk: float, _interp_u: list,
+                             _interp_v: list
+                             ) -> Tuple[float, float, float, float, float]:
 
-def advection_pa_timestep_np(p, lonpa, latpa, t, dt, mask, rk, _interp_u,
-                             _interp_v, sizeadvection):
-
-    #TODO boundary condition
+    # TODO boundary condition
     # Temporal interpolation  for velocity
-    if type(_interp_u) is list and len(_interp_u)>1:
+    if type(_interp_u) is list and len(_interp_u) > 1:
         interp_dt = int(dt / p.vel_step)
         mod_t = numpy.mod(dt, p.vel_step)
         _interp_ut = (_interp_u[interp_dt](lonpa, latpa) * (p.vel_step - mod_t)
-                      + _interp_u[interp_dt+1](lonpa, latpa) * mod_t) / p.vel_step
+                      + _interp_u[interp_dt+1](lonpa, latpa)
+                      * mod_t) / p.vel_step
         _interp_vt = (_interp_v[interp_dt](lonpa, latpa) * (p.vel_step - mod_t)
-                      + _interp_v[interp_dt+1](lonpa, latpa) * mod_t) / p.vel_step
+                      + _interp_v[interp_dt+1](lonpa, latpa)
+                      * mod_t) / p.vel_step
     else:
         _interp_ut = _interp_u[0](lonpa, latpa)
         _interp_vt = _interp_v[0](lonpa, latpa)
     dlondt = numpy.sign(p.tadvection) * _interp_ut
     dlatdt = numpy.sign(p.tadvection) * _interp_vt
+    # TODO
     # Set velocity to 0 if particle is outside domain
-    #if (rlonu < 0 or rlonu > 1 or rlatu < 0 or rlatu > 1
+    # if (rlonu < 0 or rlonu > 1 or rlatu < 0 or rlatu > 1
     #      or rlonv < 0 or rlonv > 1 or rlatv < 0 or rlatv > 1):
     #    dlondt = 0
     #    dlatdt = 0
     #    mask = 1
     # Propagate position of particle with velocity
-    deltat = (p.adv_time_step * const.day2sec) # * p.tadvection
-              #/ float(sizeadvection))
+    deltat = (p.adv_time_step * const.day2sec)  # * p.tadvection
+    #  / float(sizeadvection))
     # compute pure advection transport
     transportu = dlondt * deltat
     transportv = dlatdt * deltat
@@ -269,9 +135,12 @@ def advection_pa_timestep_np(p, lonpa, latpa, t, dt, mask, rk, _interp_u,
     turbulence = p.B * rk + p.sigma * rk * deltat
     lonpa = lonpa + transportu + inertial_partu + turbulence[0]
     latpa = latpa + transportv + inertial_partv + turbulence[1]
-    return lonpa, latpa, mask
+    return lonpa, latpa, mask, dlondt, dlatdt
 
-def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
+
+def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
+              listGr: list, grid, rank: Optional[int] = 0,
+              size: Optional[int] = 1, AMSR=None):
     # # Initialize listGrid and step
     if listGr is None:
         listGr = [grid, ]
@@ -286,8 +155,6 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
     for Trac in listGr:
         Trac.newi = numpy.zeros((2, shape_lr[0], shape_lr[1]))
         Trac.newj = numpy.zeros((2, shape_lr[0], shape_lr[1]))
-    su = (numpy.shape(VEL.Vlatu)[0], numpy.shape(VEL.Vlonu)[0])
-    sv = (numpy.shape(VEL.Vlatv)[0], numpy.shape(VEL.Vlonv)[0])
     # # Loop on particles
     first_day = (p.first_day - p.reference).total_seconds() / 86400.
     for pa in part:
@@ -329,14 +196,20 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             if p.scale is not None:
                 r, rt = init_random_walk(sizeadvection, p.adv_time_step,
                                          p.scale)
-            init = init_velocity(VEL, lonpa, latpa, su, sv)
-            iu, ju, iv, jv, dvcoord = init
-            [dVlatu, dVlatv, dVlonu, dVlonv] = dvcoord
-            vcoord = [iu, ju, iv, jv]
             if p.save_S or p.save_OW:
-                Stmp = math.sqrt(VEL.Sn[0, iv, ju]**2 + VEL.Ss[0, iu, jv]**2)
+                if p.stationary is True:
+                    Stmp = math.sqrt(dic['sn'](lonpa, latpa)**2
+                                     + dic['ss'](lonpa, latpa)**2)
+                else:
+                    Stmp = math.sqrt(dic['sn'][0](lonpa, latpa)**2
+                                     + dic['ss'][0](lonpa, latpa)**2)
+
             if p.save_RV or p.save_OW:
-                RVtmp = VEL.RV[0, iu, jv]
+                if p.stationary is True:
+                    RVtmp = dic['rv'](lonpa, latpa)
+                else:
+                    RVtmp = dic['rv'][0](lonpa, latpa)
+
             if p.save_OW:
                 OWtmp = Stmp**2 - RVtmp**2
 
@@ -345,66 +218,43 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
             mask = 0
             tstop = int(abs(p.tadvection) / p.output_step + 1)
             for t in numpy.arange(0, tstop, p.adv_time_step):
-                dt = t % p.vel_step
+                # dt = t % p.vel_step
                 # Index for random walk
                 k = int(t)
                 # Index in velocity array, set to 0 if stationary
                 ind_t = + int(t / p.vel_step)
                 if p.stationary:
                     ind_t = 0
-                #while dt < p.output_step:
+                # while dt < p.output_step:
                 rk = r[:, k]
-                advect = advection_pa_timestep_np(p, lonpa, latpa, t, dt,
-                                               mask, rk, VEL, vcoord,
-                                               dvcoord, (su, sv),
-                                               sizeadvection)
-                rcoord, vcoord, dvcoord, lonpa, latpa, mask = advect
-                rlonu, rlatu, rlonv, rlatv = rcoord
-                iu, ju, iv, jv = vcoord
-                # 2D interpolation of physical variable
-                # TODO handle enpty or 0d slice
-                if iu < su[0] - 1:
-                    slice_iu = slice(iu, min(iu + 2, su[0]))
+                advect = advection_pa_timestep_np(p, lonpa, latpa, t, mask,
+                                                  rk, dic['u'], dic['v'])
+                lonpa, latpa, mask, dlondt, dlatdt = advect
+                if p.stationary is True:
+                    if p.save_U is True:
+                        ums = dic['u'][0](lonpa, latpa)
+                    if p.save_V is True:
+                        vms = dic['v'][0](lonpa, latpa)
+                    H = dic['h'][0](lonpa, latpa)
+                    if p.save_S is True or p.save_OW is True:
+                        Sn = dic['sn'][0](lonpa, latpa)
+                        Ss = dic['ss'][0](lonpa, latpa)
+                    if p.save_RV is True or p.save_OW is True:
+                        RVtmp = dic['rv'][0](lonpa, latpa)
                 else:
-                    slice_iu = slice(su[0] - 2, su[0])
-                if iv < sv[0] - 1:
-                    slice_iv = slice(iv, min(iv + 2, sv[0]))
-                else:
-                    slice_iv = slice(sv[0] - 2, sv[0])
-                if ju < su[1] - 1:
-                    slice_ju = slice(ju, min(ju + 2, su[1]))
-                else:
-                    slice_ju = slice(su[1] - 2, su[1])
-                if jv < sv[1] - 1:
-                    slice_jv = slice(jv, min(jv + 2, sv[1]))
-                else:
-                    slice_jv = slice(sv[1] - 2, sv[1])
-                if p.save_U is True:
-                    try:
-                        ums = mod_tools.lin_2Dinterp(VEL.us[ind_t, slice_iu,
-                                                 slice_ju], rlonu, rlatu)
-                    except:
-                        logger.error('issue on lin_2D interp')
-                if p.save_V is True:
-                    vms = mod_tools.lin_2Dinterp(VEL.vs[ind_t, slice_iv,
-                                                 slice_jv], rlonv, rlatv)
-                if p.stationary is False:
-                    VEL.ht = interpol_intime(VEL.h, ind_t, (iu, jv),
-                                             dt / p.vel_step, (su[0],
-                                             sv[1]))
-                else:
-                    VEL.ht = no_interpol_intime(VEL.h, (iu, jv), (su[0],
-                                                sv[1]))
-                H = mod_tools.lin_2Dinterp(VEL.ht, rlonv, rlatu)
+                    if p.save_U is True:
+                        ums = dic['u'][ind_t](lonpa, latpa)
+                    if p.save_V is True:
+                        vms = dic['v'][ind_t](lonpa, latpa)
+                    # TODO temporal interpolation
+                    H = dic['h'][ind_t](lonpa, latpa)
+                    if p.save_S is True or p.save_OW is True:
+                        Sn = dic['sn'][ind_t](lonpa, latpa)
+                        Ss = dic['ss'][ind_t](lonpa, latpa)
+                    if p.save_RV is True or p.save_OW is True:
+                        RVtmp = dic['rv'][ind_t](lonpa, latpa)
                 if p.save_S is True or p.save_OW is True:
-                    Sn = mod_tools.lin_2Dinterp(VEL.Sn[ind_t, slice_iv,
-                                                slice_ju], rlonu, rlatv)
-                    Ss = mod_tools.lin_2Dinterp(VEL.Ss[ind_t, slice_iu,
-                                                slice_jv], rlonv, rlatu)
                     Stmp = numpy.sqrt((Sn**2 + Ss**2))
-                if p.save_RV is True or p.save_OW is True:
-                    RVtmp = mod_tools.lin_2Dinterp(VEL.RV[ind_t, slice_iu,
-                                                slice_jv], rlonv, rlatu)
                 if p.save_OW is True:
                     OWtmp = Stmp**2 - RVtmp**2
 
@@ -432,7 +282,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                         vOW.append(OWtmp)
                     else:
                         vOW = 0
-                #k += 1
+                # k += 1
                 # -- Store new longitude and new latitude at each output_step
                 if (t % p.output_step + p.adv_time_step > 1):
                     lon_lr[int(t) + 1, pa - i0] = lonpa
@@ -456,14 +306,15 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
 
         if pa % 200 == 0:
             perc = float(pa - i0) / float(numpy.shape(part)[0])
-            mod_tools.update_progress(perc, f'{pa} particles', f'{rank} node')
+            tools.update_progress(perc, f'{pa} particles', f'{rank} node')
         if p.save_traj:
             if pa == i0:
                 init = init_full_traj(p, numpy.shape(vlonpa)[0], i1 - i0)
 
                 lon_hr, lat_hr, mask_hr, S_hr, RV_hr, OW_hr, u_hr, v_hr, h_hr = init
-            if (vlonpa[0] != vlonpa[1] or vlatpa[0] != vlatpa[1]
-                 or (not numpy.array(vmask).all())):
+            _cond = (vlonpa[0] != vlonpa[1] or vlatpa[0] != vlatpa[1]
+                     or (not numpy.array(vmask).all()))
+            if _cond:
                 lon_hr[:, pa - i0] = numpy.transpose(vlonpa)
                 lat_hr[:, pa - i0] = numpy.transpose(vlatpa)
                 mask_hr[:, pa - i0] = numpy.transpose(vmask)
@@ -483,7 +334,7 @@ def advection(part, VEL, p, i0, i1, listGr, grid, rank=0, size=1, AMSR=None):
                 OW_hr[:, pa - i0] = numpy.transpose(vOW)
             # mask_hr[:, pa - i0] = numpy.transpose(vmask)
     dict_output = {}
-    mod_tools.update_progress(1, f'{len(part)} particles', f'{rank} node')
+    tools.update_progress(1, f'{len(part)} particles', f'{rank} node')
     if p.save_traj is True:
         dict_output['lon_hr'] = lon_hr
         dict_output['lat_hr'] = lat_hr
@@ -513,34 +364,37 @@ def interpolate_tracer(p, shape_lon, shape_tra, grid, Tr, AMSR, t):
             itra = int(grid.ii[i, j])
             jtra = int(grid.ij[i, j])
             if (itra < shape_tra[0]) and (jtra < shape_tra[1]):
-                rlat = grid.ri[i, j]
-                rlon = grid.rj[i, j]
-                if rlon != 0:
-                    signlon = int(rlon / abs(rlon))
-                else:
-                    signlon = 0
-                if rlat != 0:
-                    signlat = int(rlat / abs(rlat))
-                else:
-                    signlat = 0
-                if ((itra > 0) and (jtra > 0) and (itra < shape_tra[0] - 1)
-                     and (jtra < shape_tra[1] - 1)):
-                    if ((numpy.isnan(var[itra, jtra]))
-                            or ((var[itra, jtra]) < -10.)):
-                            # or numpy.isnan(Tr.var[int(Tr.ii[i,j+signlon])
-                            # , int(Tr.ij[i,j+signlon])])
-                            # or numpy.isnan(Tr.var[int(Tr.ii[i+signlat,j])
-                            # , int(Tr.ij[i+signlat,j])]):
+                # rlat = grid.ri[i, j]
+                # rlon = grid.rj[i, j]
+                # if rlon != 0:
+                #    signlon = int(rlon / abs(rlon))
+                # else:
+                #     signlon = 0
+                # if rlat != 0:
+                #     signlat = int(rlat / abs(rlat))
+                # else:
+                #     signlat = 0
+                _cond_inside = ((itra > 0) and (jtra > 0)
+                                and (itra < shape_tra[0] - 1)
+                                and (jtra < shape_tra[1] - 1))
+                if _cond_inside:
+                    _cond_masked = ((numpy.isnan(var[itra, jtra]))
+                                    or ((var[itra, jtra]) < -10.))
+                    if _cond_masked:
+                        # or numpy.isnan(Tr.var[int(Tr.ii[i,j+signlon])
+                        # , int(Tr.ij[i,j+signlon])])
+                        # or numpy.isnan(Tr.var[int(Tr.ii[i+signlat,j])
+                        # , int(Tr.ij[i+signlat,j])]):
                         grid.var2[t, i, j] = numpy.nan
                     else:
-                        if signlat > 0:
-                            slice_i = slice(i, i + signlat)
-                        else:
-                            slice_i = slice(i + signlat, i)
-                        if signlon > 0:
-                            slice_j = slice(j, j + signlon)
-                        else:
-                            slice_j = slice(j + signlon, j)
+                        # if signlat > 0:
+                        #     slice_i = slice(i, i + signlat)
+                        # else:
+                        #     slice_i = slice(i + signlat, i)
+                        # if signlon > 0:
+                        #     slice_j = slice(j, j + signlon)
+                        # else:
+                        #     slice_j = slice(j + signlon, j)
 
                         # tra = int(grid.ii[slice_i, slice_j])
                         # a = var[itra: int(Tr.ii[i,j + signlon],
@@ -603,44 +457,14 @@ def reordering(Tr, grid, AMSR, p):
                 itra = int(grid.ii[i, j])
                 jtra = int(grid.ij[i, j])
                 if (itra < shape_tra[0]) and (jtra < shape_tra[1]):
-                    rlat = grid.ri[i, j]
-                    rlon = grid.rj[i, j]
-                    if rlon != 0:
-                        signlon = rlon / abs(rlon)
-                    else:
-                        signlon = 0
-                    if rlat != 0:
-                        signlat = rlat / abs(rlat)
-                    else:
-                        signlat = 0
-                    if ((itra > 0) and (jtra > 0) and (itra < shape_tra[0] - 1)
-                          and (jtra < shape_tra[1] - 1)):
+                    _cond_inside = ((itra > 0) and (jtra > 0)
+                                    and (itra < shape_tra[0] - 1)
+                                    and (jtra < shape_tra[1] - 1))
+                    if _cond_inside:
                         if ((numpy.isnan(Tr.var[itra, jtra]))
                                 or ((Tr.var[itra, jtra]) < -10.)):
-                                # or numpy.isnan(Tr.var[int(Tr.ii[i,j+signlon])
-                                # , int(Tr.ij[i,j+signlon])])
-                                # or numpy.isnan(Tr.var[int(Tr.ii[i+signlat,j])
-                                # , int(Tr.ij[i+signlat,j])]):
                             grid.var2[t, i, j] = -999.
-                            # Tr.var[int(Tr.ii[i,j]),int(Tr.ij[i,j])]
                         else:
-                            # tmpvar1=(1-abs(rlon))*Tr.var[int(Tr.ii[i,j]),
-                            #   int(Tr.ij[i,j])]+abs(rlon)*Tr.var[int(Tr.ii[i,j+
-                            #   signlon]),int(Tr.ij[i,j+signlon])]
-                            # tmpvar2=(1-abs(rlon))*
-                            #   Tr.var[int(Tr.ii[i+signlat,j]),
-                            #   int(Tr.ij[i+signlat,j])]+abs(rlon)*
-                            #   Tr.var[int(Tr.ii[i+signlat,j+signlon]),
-                            #   int(Tr.ij[i+signlat,j+signlon])]
-                            # Tr.var2[i,j]=((1-abs(rlon))*
-                            #   Tr.var[int(Tr.ii[i,j]),int(Tr.ij[i,j])]+
-                            #   abs(rlon)*Tr.var[int(Tr.ii[i,j+signlon]),
-                            #   int(Tr.ij[i,j+signlon])]+(1-abs(rlat))*
-                            #   Tr.var[int(Tr.ii[i,j]),int(Tr.ij[i,j])]+
-                            #   abs(rlat)*Tr.var[int(Tr.ii[i+signlat,j]),
-                            #   int(Tr.ij[i+signlat,j])])/2.
-                            # Tr.var2[t,i,j]=(1-abs(rlat))*tmpvar1+
-                            #   abs(rlat)*tmpvar2
                             grid.var2[t, i, j] = Tr.var[itra, jtra]
                     else:
                         grid.var2[t, i, j] = Tr.var[itra, jtra]
@@ -650,24 +474,13 @@ def reordering(Tr, grid, AMSR, p):
                     grid.var2[t, i, j] = nudging_AMSR(AMSR, grid.lon[i, j],
                                                       grid.lat[i, j],
                                                       grid.var2[t, i, j], t, p)
-                    # grid.var2[t,:,:]= grid.var2[t,i,j]
-                    # numpy.where(grid.mask, numpy.nan, grid.var2[t,:,:])
-                    # ]=numpy.nan
     grid.var2[numpy.isnan(grid.var2)] = p.fill_value
     grid.var2[abs(grid.var2) > 50.] = p.fill_value
     grid.var2 = numpy.ma.array(grid.var2, mask=(grid.var2 == p.fill_value))
-    # grid.mask)
     grid.var = grid.var2
-    # Tr.var2[0,:,:]=numpy.ma.array(Tr.var2[0,:,:], mask=Tr.mask)
-    # Tr.var2[1,:,:]=numpy.ma.array(Tr.var2[1,:,:], mask=Tr.mask)
-    # Tr.var=numpy.ma.array(Tr.var, mask=numpy.isnan(Tr.var))
-    # Tr.var2=numpy.ma.array(Tr.var2, mask=numpy.isnan(Tr.var2))
-
-# def interp(Tr, grid, ):
-# interp2d
 
 
-def reordering1d(p, listTr, listGr):
+def reordering1d(p, listTr: list, listGr: list):
     first_day = (p.first_day - p.reference).total_seconds() / 86400
     if listGr:
         n2, nt, npa = numpy.shape(listGr[0].newi)
@@ -691,7 +504,7 @@ def reordering1d(p, listTr, listGr):
         return None
 
 
-def reordering1dmpi(p, listTr, listGr):
+def reordering1dmpi(p, listTr: list, listGr: list):
     tra = None
     first_day = (p.first_day - p.reference).total_seconds() / 86400
     if listGr:

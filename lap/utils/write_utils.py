@@ -39,19 +39,23 @@ def write_velocity(data, outfile, description='AVISO-like data',
     # - Create dimensions
     ndim_lon = 'lon'
     ndim_lat = 'lat'
-    ndim_glon = 'lon_gcp'
-    ndim_glat = 'lat_gcp'
+    if 'gcp' in data.keys():
+        ndim_glon = 'lon_gcp'
+        ndim_glat = 'lat_gcp'
     ndim_time = 'time'
     ndim_time1 = 'time1'
     dim_lon = len(numpy.shape(lon))
     fid.createDimension(ndim_lat, numpy.shape(lat)[0])
-    fid.createDimension(ndim_glat, numpy.shape(data['lat_gcp'])[0])
+    if 'gcp' in data.keys():
+        fid.createDimension(ndim_glat, numpy.shape(data['lat_gcp'])[0])
     if dim_lon == 1:
         fid.createDimension(ndim_lon, numpy.shape(data['lon'])[0])
-        fid.createDimension(ndim_glon, numpy.shape(data['lon_gcp'])[0])
+        if 'gcp' in data.keys():
+            fid.createDimension(ndim_glon, numpy.shape(data['lon_gcp'])[0])
     elif dim_lon == 2:
         fid.createDimension(ndim_lon, numpy.shape(lon)[1])
-        fid.createDimension(ndim_glon, numpy.shape(data['lon_gcp'])[1])
+        if 'gcp' in data.keys():
+            fid.createDimension(ndim_glon, numpy.shape(data['lon_gcp'])[1])
     else:
         logger.error(f'Wrong number of dimension in longitude, is {dim_lon}'
                      'should be one or two')
@@ -64,78 +68,89 @@ def write_velocity(data, outfile, description='AVISO-like data',
     if dim_lon == 1:
         vlon = fid.createVariable('lon', 'f4', (ndim_lon))
         vlat = fid.createVariable('lat', 'f4', (ndim_lat))
-        vglon = fid.createVariable('lon_gcp', 'f4', (ndim_glon))
-        vglat = fid.createVariable('lat_gcp', 'f4', (ndim_glat))
-        vilon = fid.createVariable('index_lon_gcp', 'f4', (ndim_glon))
-        vilat = fid.createVariable('index_lat_gcp', 'f4', (ndim_glat))
         vlon[:] = lon
         vlat[:] = lat
-        vglon[:] = data['lon_gcp']
-        vglat[:] = data['lat_gcp']
-        vilon[:] = data['index_lon_gcp']
-        vilat[:] = data['index_lat_gcp']
+        if 'gcp' in data.keys():
+            vglon = fid.createVariable('lon_gcp', 'f4', (ndim_glon))
+            vglat = fid.createVariable('lat_gcp', 'f4', (ndim_glat))
+            vilon = fid.createVariable('index_lon_gcp', 'f4', (ndim_glon))
+            vilat = fid.createVariable('index_lat_gcp', 'f4', (ndim_glat))
+            vglon[:] = data['lon_gcp']
+            vglat[:] = data['lat_gcp']
+            vilon[:] = data['index_lon_gcp']
+            vilat[:] = data['index_lat_gcp']
     elif dim_lon == 2:
         vlon = fid.createVariable('lon', 'f4', (ndim_lat, ndim_lon))
         vlat = fid.createVariable('lat', 'f4', (ndim_lat, ndim_lon))
-        vglon = fid.createVariable('lon_gcp', 'f4', (ndim_glat, ndim_glon))
-        vglat = fid.createVariable('lat_gcp', 'f4', (ndim_glat, ndim_glon))
-        vilon = fid.createVariable('index_lon_gcp', 'f4', (ndim_glat, ndim_glon))
-        vilat = fid.createVariable('index_lat_gcp', 'f4', (ndim_glat, ndim_glon))
         vlon[:, :] = lon
         vlat[:, :] = lat
-        vglon[:, :] = data['lon_gcp']
-        vglat[:, :] = data['lat_gcp']
-        vilon[:, :] = data['index_lon_gcp']
-        vilat[:, :] = data['index_lat_gcp']
+        if 'gcp' in data.keys():
+            vglon = fid.createVariable('lon_gcp', 'f4', (ndim_glat, ndim_glon))
+            vglat = fid.createVariable('lat_gcp', 'f4', (ndim_glat, ndim_glon))
+            vilon = fid.createVariable('index_lon_gcp', 'f4', (ndim_glat,
+                                                               ndim_glon))
+            vilat = fid.createVariable('index_lat_gcp', 'f4', (ndim_glat,
+                                                               ndim_glon))
+            vglon[:, :] = data['lon_gcp']
+            vglat[:, :] = data['lat_gcp']
+            vilon[:, :] = data['index_lon_gcp']
+            vilat[:, :] = data['index_lat_gcp']
     vlon.units = unit['lon']
     vlat.units = unit['lat']
     vlon.long_name = long_name['lon']
     vlat.long_name = long_name['lat']
-    vglon.units = unit['lon']
-    vglat.units = unit['lat']
-    vglon.long_name = f'ground control point {long_name["lon"]}'
-    vglat.long_name = f'ground control point {long_name["lat"]}'
-    vilon.long_name = f' index of ground control point in {long_name["lon"]} dimension'
-    vilat.long_name = f' index of ground control point in {long_name["lat"]} dimension'
+    if 'gcp' in data.keys():
+        vglon.units = unit['lon']
+        vglat.units = unit['lat']
+        vglon.long_name = f'ground control point {long_name["lon"]}'
+        vglat.long_name = f'ground control point {long_name["lat"]}'
+        _text = 'index of ground control point in'
+        vilon.long_name = f'{_text} {long_name["lon"]} dimension'
+        vilat.long_name = f'{_text} {long_name["lat"]} dimension'
     for key, value in kwargs.items():
         if value.any():
             dim_value = len(value.shape)
-            bin_key = f'{key}_bin'
-            bvalue, scale, offset = pack_as_ubytes(value, fill_value)
+            if 'gcp' in data.keys():
+                bin_key = f'{key}_bin'
+                bvalue, scale, offset = pack_as_ubytes(value, fill_value)
             if dim_value == 1:
                 var = fid.createVariable(str(key), 'f4', (ndim_time, ),
                                          fill_value=fill_value)
                 var[:] = value
-                bvar = fid.createVariable(bin_key, 'u1', (ndim_time, ),
-                                          fill_value=numpy.ubyte(255))
-                bvar[:] = bvalue
+                if 'gcp' in data.keys():
+                    bvar = fid.createVariable(bin_key, 'u1', (ndim_time, ),
+                                              fill_value=numpy.ubyte(255))
+                    bvar[:] = bvalue
 
             if dim_value == 2:
                 var = fid.createVariable(str(key), 'f4', (ndim_time1, ndim_lat,
                                          ndim_lon), fill_value=fill_value)
                 var[0, :, :] = value
-                bvar = fid.createVariable(bin_key, 'u1', (ndim_time1, ndim_lat,
-                                          ndim_lon),
-                                          fill_value=numpy.ubyte(255))
-                bvar[0, :, :] = bvalue
+                if 'gcp' in data.keys():
+                    bvar = fid.createVariable(bin_key, 'u1', (ndim_time1,
+                                              ndim_lat, ndim_lon),
+                                              fill_value=numpy.ubyte(255))
+                    bvar[0, :, :] = bvalue
             elif dim_value == 3:
                 var = fid.createVariable(str(key), 'f4', (ndim_time, ndim_lat,
                                          ndim_lon), fill_value=fill_value)
                 var[:, :, :] = value
-                bvar = fid.createVariable(bin_key, 'u1', (ndim_time, ndim_lat,
-                                          ndim_lon),
-                                          fill_value=numpy.ubyte(255))
-                bvar[:, :, :] = bvalue
+                if 'gcp' in data.keys():
+                    bvar = fid.createVariable(bin_key, 'u1', (ndim_time,
+                                              ndim_lat, ndim_lon),
+                                              fill_value=numpy.ubyte(255))
+                    bvar[:, :, :] = bvalue
             if str(key) in unit.keys():
                 var.units = unit[str(key)]
                 bvar.units = unit[str(key)]
             if str(key) in long_name.keys():
                 var.long_name = long_name[str(key)]
                 bvar.long_name = long_name[str(key)]
-            bvar.scale_factor = scale
-            bvar.add_offset = offset
-            bvar.valid_min = 0
-            bvar.valid_max = 254
+            if 'gcp' in data.keys():
+                bvar.scale_factor = scale
+                bvar.add_offset = offset
+                bvar.valid_min = 0
+                bvar.valid_max = 254
 
     for key, value in meta.items():
         setattr(fid, key, value)
