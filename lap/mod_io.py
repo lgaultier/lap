@@ -2,6 +2,7 @@ import numpy
 import os
 import sys
 import datetime
+import glob
 import lap.utils.read_utils as read_utils
 import lap.utils.write_utils as write_utils
 import lap.utils.tools as tools
@@ -177,6 +178,17 @@ def read_grid_netcdf(p):
     get_regular_tracer(p, Tr, get_coord=True)
     return Tr
 
+def read_points(p):
+    # # TODO, lon= ... lat= ...
+    dic = read_utils.read_trajectory(p.filetrajectory, ('lon_hr', 'lat_hr',
+                                                        'mask_hr',
+                                                        'zonal_velocity'))
+    Tr = read_utils.initclass()
+    Tr.lon = dic['lon_hr'][-1, :]
+    Tr.lat = dic['lat_hr'][-1, :]
+    Tr.mask = dic['mask_hr'][-1, :]
+    #numpy.ones(numpy.shape(Tr.lon), dtype=bool)
+    return Tr
 
 '''
 # TODO is it used?
@@ -244,36 +256,23 @@ def Read_grid_model(p):
     return Tr
 
 
-def make_mask(p):
+def make_mask(p, VEL):
     # mask_grid
-    filename = os.path.join(p.vel_input_dir, p.list_vel[0])
-    if not os.path.isfile(filename):
-        logger.error(f'File {filename} not found')
-        sys.exit(1)
-    if p.vel_format == 'regular_netcdf':
-        VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
-                                         varv=p.name_u, lon=p.name_lon,
-                                         lat=p.name_lat, box=p.box)
-
-    elif p.vel_format == 'nemo':
-        VEL = read_utils.nemo(filename=filename, varu=p.name_u,
-                              varv=p.name_v, lon=p.name_lon,
-                              lat=p.name_lat, box=p.box, subsample=p.subsample)
-
-    VEL.read_coord()
-    VEL.read_vel()
     # VEL.lon = (VEL.lon + 360.) % 360.
-    lon2du, lat2du = numpy.meshgrid(VEL.lon, VEL.lat)
-    masku = VEL.varu
+    masku = + VEL['u']['array'][0, :, :]
     masku[abs(masku) > 50.] = numpy.nan
-    masku[abs(VEL.varv) > 50.] = numpy.nan
-    Teval = interpolate.RectBivariateSpline(VEL.lat, VEL.lon,
+    masku[abs(VEL['v']['array'][0, :, :]) > 50.] = numpy.nan
+    masku[VEL['v']['array'][0, :, :] == 0.] = numpy.nan
+    masku[VEL['u']['array'][0, :, :] == 0.] = numpy.nan
+    vlat = VEL['u']['lat']
+    vlon = VEL['u']['lon']
+    Teval = interpolate.RectBivariateSpline(vlat, vlon,
                                             numpy.isnan(masku), kx=1, ky=1,
                                             s=0)
     return Teval
 
 
-def make_grid(p):
+def make_grid(p, VEL, coord):
     _coord = list(p.parameter_grid)
     if len(_coord) == 6:
         lon0, lon1, dlon, lat0, lat1, dlat = list(p.parameter_grid)
@@ -287,25 +286,60 @@ def make_grid(p):
     lattmp = numpy.linspace(lat0, lat1, int((lat1 - lat0) / dlat))
     Tr.lon, Tr.lat = numpy.meshgrid(lontmp, lattmp)
     # TODO PROVIDE A MASK FILE
-    Teval = make_mask(p)
+    Teval = make_mask(p, VEL)
     masktmp = Teval(lattmp, lontmp)
     shape_tra = numpy.shape(Tr.lon)
     masktmp = masktmp.reshape(shape_tra)
     # TODO create real mask
-    # masktmp = numpy.ones(shape_tra)
-    Tr.mask = (masktmp > 0)
+    #masktmp = numpy.zeros(shape_tra)
+    Tr.mask = numpy.ma.getdata((masktmp > 0))
+    #Tr.mask = numpy.ma.getdata()
     return Tr
 
 
 # #############################
 # #        READ VEL         ##
 # #############################
-def read_velocity(p, get_time=None):
-    # Read velocity
-    filename = os.path.join(p.vel_input_dir, p.list_vel[0])
-    if not os.path.isfile(filename):
-        logger.error(f'File {filename} not found')
+def sort_files(p):
+    list_file = sorted(glob.glob(os.path.join(p.vel_input_dir,
+                                              f'*{p.pattern}*')))
+    list_date = []
+    list_name = []
+    for ifile in list_file:
+        match = p.MATCH(ifile)
+        if match is None:
+            continue
+        _date = datetime.datetime(int(match.group(1)), int(match.group(2)),
+                                  int(match.group(3)))
+        if _date >= p.first_date and _date <= p.last_date:
+            list_date.append(_date)
+            list_name.append(ifile)
+    if not list_name:
+        logger.error(f'{p.pattern} files not found in {p.vel_input_dir}')
         sys.exit(1)
+    # The frequency between the grids must be constant.
+    s = len(list_date) -1
+    _ind = numpy.argsort(list_date)
+    #list_date = list_date[_ind]
+    #list_name = list_name[_ind]
+    diff = [(list_date[x + 1] - list_date[x]).total_seconds() for x in range(s)]
+    _ind = numpy.where(numpy.array(diff)>86400)
+    #print(_ind)
+    #print(diff[264], diff[480])
+
+    #print(list_name[264], list_name[480])
+    frequency = list(set(diff))
+    #if len(frequency) != 1:
+    #    raise RuntimeError(f"Time series does not have a constant step between"
+    #                        " two grids: {frequency} seconds")
+    return list_name, list_date, frequency[0]
+
+
+def read_velocity(p, get_time=None):
+    # Make_list_velocity
+    list_vel, list_date, freq = sort_files(p)
+    # Read velocity
+    filename = os.path.join(p.vel_input_dir, list_vel[0])
     if p.vel_format == 'regular_netcdf':
         VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
                                          varv=p.name_v, lon=p.name_lon,
@@ -318,6 +352,7 @@ def read_velocity(p, get_time=None):
         logger.error(f'{p.vel_format} format is not handled')
         sys.exit(1)
     VEL.read_coord()
+    VEL.read_vel()
     # TODO check this format?
     if len(VEL.lon.shape) == 2:
         lon2du, lat2du = (VEL.lon, VEL.lat)
@@ -326,30 +361,44 @@ def read_velocity(p, get_time=None):
         lon2du, lat2du = numpy.meshgrid(VEL.lon, VEL.lat)
         lon2dv, lat2dv = numpy.meshgrid(VEL.lon, VEL.lat)
     # Intialize empty matrices
+    tlength = (p.last_date - p.first_date).total_seconds()
+    if len(numpy.shape(VEL.varu)) == 3 and p.stationary is False:
+        ninfilestep = numpy.shape(VEL.varu)[0]
+    else:
+        ninfilestep = 1
+
     if p.stationary is True:
         num_steps = 1
     else:
-        num_steps = int(abs(p.tadvection) / p.vel_step) + 2
-    shape_vel_u = (num_steps, numpy.shape(lat2du)[0],
-                   numpy.shape(lon2du)[1])
-    shape_vel_v = (num_steps, numpy.shape(lat2dv)[0],
-                   numpy.shape(lon2dv)[1])
-    u = numpy.zeros(shape_vel_u)
-    v = numpy.zeros(shape_vel_v)
-    usave = numpy.zeros(shape_vel_u)
-    vsave = numpy.zeros(shape_vel_v)
-    h = numpy.zeros(shape_vel_u)
-    Sn = numpy.zeros(shape_vel_u)
-    Ss = numpy.zeros(shape_vel_u)
-    RV = numpy.zeros(shape_vel_u)
-    for t in range(0, num_steps):
-        if num_steps != 1:
-            perc = float(t / (num_steps - 1))
+        num_steps = int(tlength / freq *  ninfilestep) + 2
+    coord = {}
+    dic = {}
+    coord['lonu'] = numpy.mod(VEL.lon[:] + 360., 360.)
+    coord['latu'] = VEL.lat[:]
+    coord['lonv'] = numpy.mod(VEL.lon[:] + 360., 360.)
+    coord['latv'] = VEL.lat[:]
+    coord['lon2du'] = numpy.mod(lon2du + 360., 360.)
+    coord['lat2du'] = lat2du
+    coord['lon2dv'] = numpy.mod(lon2du + 360., 360.)
+    coord['lon2dv'] = lat2dv
+    coord['time'] = []
+    dic['u'] = {'array': [], 'lon': coord['lonu'], 'lat': coord['latu']}
+    dic['v'] = {'array': [], 'lon': coord['lonv'], 'lat': coord['latv']}
+    dic['ums'] = {'array': [], 'lon': coord['lonu'], 'lat': coord['latu']}
+    dic['vms'] = {'array': [], 'lon': coord['lonv'], 'lat': coord['latv']}
+    if p.name_h is not None:
+        dic['h'] = {'array': [], 'lon': coord['lonu'], 'lat': coord['latv']}
+    if p.save_S or p.save_RV or p.save_OW:
+        dic['sn'] = {'array': [], 'lon': coord['lonu'], 'lat': coord['latv']}
+        dic['ss'] = {'array': [], 'lon': coord['lonu'], 'lat': coord['latv']}
+        dic['rv'] = {'array': [], 'lon': coord['lonu'], 'lat': coord['latv']}
+
+    for t in range(len(list_date)):
+        if p.stationary is False:
+            perc = float(t / (len(list_date)))
             tools.update_progress(perc, '', '')
-        filename = os.path.join(p.vel_input_dir, p.list_vel[t])
-        if not os.path.isfile(filename):
-            logger.error(f'File {filename} not found')
-            sys.exit(1)
+        filename = list_vel[t]
+        # Initialize velocity object
         if p.vel_format == 'regular_netcdf':
             VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
                                              varv=p.name_v, lon=p.name_lon,
@@ -363,83 +412,64 @@ def read_velocity(p, get_time=None):
         else:
             logger.error('Undefined Velocity file type')
             sys.exit(1)
+        # Read velocity variable, extract box and filter if necessary
         if t == 0:
             VEL.read_vel(size_filter=p.vel_filter)
             slice_x = VEL.slice_x
             slice_y = VEL.slice_y
         else:
             VEL.read_vel(size_filter=p.vel_filter, slice_xy=(slice_x, slice_y))
-        # TODO: to change
+        VEL.read_time()
+        coord['time'].append(VEL.time)
+        # Read SSH if needed
         if p.name_h is not None:
             VEL.read_var(size_filter=p.vel_filter)
-        if t == num_steps - 1:
-            VEL.read_coord()
-            VEL.Vlonu = numpy.mod(VEL.lon[:] + 360., 360.)
-            VEL.Vlatu = VEL.lat[:]
-            VEL.Vlonv = numpy.mod(VEL.lon[:] + 360., 360.)
-            VEL.Vlatv = VEL.lat[:]
-        # # TODO A CHANGER , Initialize u and v here
-        # VEL.masku=numpy.ma.masked_where(VEL.varu), VEL.varu[numpy.isnan(
-        # VEL.varu) and (abs(VEL.varu)>10) and (abs(VEL.varv)>10)]
+            VEL.var[numpy.where(abs(VEL.var) > 100)] = numpy.nan
+        # Mask data
         mask = (numpy.ma.getmaskarray(VEL.varu)
                 | numpy.ma.getmaskarray(VEL.varv)
                 | numpy.isnan(VEL.varu) | numpy.isnan(VEL.varv)
                 | (VEL.varu == p.missing_value)
                 | (VEL.varv == p.missing_value))
-        # VEL.varu[numpy.where(abs(VEL.varu) > 10)] = 0
-        # VEL.varv[numpy.where(abs(VEL.varv) > 10)] = 0
-        if p.name_h is not None:
-            VEL.var[numpy.where(abs(VEL.var) > 100)] = numpy.nan
-        # utmp, vtmp = tools.convert(lon2du, lat2du, VEL.varu, VEL.varv)
-        # TODO separate function to convert m/s in deg/day
-        utmp, vtmp = tools.ms2degd(lon2du, lat2du, VEL.varu, VEL.varv)
         VEL.varu[mask] = 0
         VEL.varv[mask] = 0
-        utmp[mask] = 0
-        vtmp[mask] = 0
 
-        # Compute Strain Relative Vorticity and Okubo Weiss
-        # TODO Create separate  function
-
-        if p.save_S or p.save_RV or p.save_OW:
-            gfo = (9.81 / numpy.cos(numpy.mean((lat2du + lat2dv)/2)*pi/180.)
-                   / (2 * const.omega))
-            dxlatu = (lat2du[2:, 1: -1] - lat2du[: -2, 1: -1])
-            dylonu = (lon2du[1: -1, 2:] - lon2du[1: -1, : -2])
-            dxlatv = (lat2dv[2:, 1: -1] - lat2dv[:-2, 1: -1])
-            dylonv = (lon2dv[1: -1, 2:] - lon2dv[1: -1, : -2])
-            dyutmp = utmp[1: -1, 2:] - utmp[1: -1, : -2]
-            dyvtmp = vtmp[1: -1, 2:] - vtmp[1: -1, : -2]
-            dxutmp = utmp[2:, 1: -1] - utmp[:-2, 1: -1]
-            dxvtmp = vtmp[2:, 1: -1] - vtmp[:-2, 1: -1]
-        if p.save_RV or p.save_OW:
-            RV[t, 1: -1, 1: -1] = gfo*(dyvtmp / dylonv - dxutmp / dxlatu)
-        if p.save_S or p.save_OW:
-            Sn[t, 1: -1, 1: -1] = gfo*(dyutmp / dylonu - dxvtmp / dxlatv)
-            Ss[t, 1: -1, 1: -1] = gfo*(dxutmp / dxlatu + dyvtmp / dylonv)
-        u[t, :, :] = + utmp
-        v[t, :, :] = + vtmp
-        usave[t, :, :] = + VEL.varu
-        vsave[t, :, :] = + VEL.varv
-        if p.name_h is not None:
-            h[t, :, :] = + VEL.var
-    # if p.save_S or p.save_RV or p.save_OW:
-    #    compute_strain_vort
-    step = numpy.sign(p.tadvection) * p.vel_step
-    first_day = (p.first_day - p.reference).total_seconds() / 86400
-    stop = first_day + int(abs(p.tadvection) + 1) * numpy.sign(p.tadvection)
-    VEL.time = numpy.arange(first_day, stop, step)
-    VEL.u = + u
-    VEL.v = + v
-    VEL.us = + usave
-    VEL.vs = + vsave
-    VEL.h = + h
-    if p.save_S or p.save_OW:
-        VEL.Ss = filters.gaussian_filter(Ss, 4)
-        VEL.Sn = filters.gaussian_filter(Sn, 4)
-    if p.save_RV or p.save_OW:
-        VEL.RV = filters.gaussian_filter(RV, 4)
-    return VEL
+        for nt in range(ninfilestep):
+        # Convert velocity from m/s to degd
+            utmp, vtmp = tools.ms2degd(lon2du, lat2du, VEL.varu[nt, :, :],
+                                       VEL.varv[nt, :, :])
+            dic['u']['array'].append(utmp[:, :])
+            dic['v']['array'].append(vtmp[:, :])
+            dic['ums']['array'].append(VEL.varu[nt, :, :])
+            dic['vms']['array'].append(VEL.varv[nt, :, :])
+            if p.name_h is not None:
+                h[nt, :, :] = + VEL.var[nt, :, :]
+            if p.save_S or p.save_RV or p.save_OW:
+                mlat = numpy.deg2rad(numpy.mean((lat2du + lat2dv)/2))
+                gfo = (9.81 / numpy.cos(mlat) / (2 * const.omega))
+                dxlatu = (lat2du[2:, 1: -1] - lat2du[: -2, 1: -1])
+                dylonu = (lon2du[1: -1, 2:] - lon2du[1: -1, : -2])
+                dxlatv = (lat2dv[2:, 1: -1] - lat2dv[:-2, 1: -1])
+                dylonv = (lon2dv[1: -1, 2:] - lon2dv[1: -1, : -2])
+                dyutmp = utmp[1: -1, 2:] - utmp[1: -1, : -2]
+                dyvtmp = vtmp[1: -1, 2:] - vtmp[1: -1, : -2]
+                dxutmp = utmp[2:, 1: -1] - utmp[:-2, 1: -1]
+                dxvtmp = vtmp[2:, 1: -1] - vtmp[:-2, 1: -1]
+            if p.save_RV or p.save_OW:
+                RV = numpy.zeros(numpy.shape(utmp))
+                RV[1: -1, 1: -1] = gfo*(dyvtmp / dylonv - dxutmp / dxlatu)
+                dic['rv']['array'].append(filters.gaussian_filter(RV, 4))
+            if p.save_S or p.save_OW:
+                Sn = numpy.zeros(numpy.shape(utmp))
+                Ss = numpy.zeros(numpy.shape(vtmp))
+                Sn[1: -1, 1: -1] = gfo*(dyutmp / dylonu - dxvtmp / dxlatv)
+                Ss[1: -1, 1: -1] = gfo*(dxutmp / dxlatu + dyvtmp / dylonv)
+                dic['sn']['array'].append(Sn)
+                dic['ss']['array'].append(Ss)
+    for key, value in dic.items():
+        dic[key]['array'] = numpy.array(value['array'])
+    coord['time'] = numpy.array(coord['time']).flatten()
+    return dic, coord
 
 
 '''

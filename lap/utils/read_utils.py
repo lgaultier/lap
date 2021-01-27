@@ -71,65 +71,26 @@ def read_var(filename, var, index=None, time=0, depth=0, subsample=1,
         sys.exit(1)
 
     # - Read variable
-    if index is None:
-        if ndim == 1:
-            T = numpy.ma.array(fid.variables[var][:]).squeeze()
-            T = T[::subsample]
-        elif ndim == 2:
-            T = numpy.ma.array(fid.variables[var][:, :]).squeeze()
-            T = T[::subsample, ::subsample]
-        elif ndim == 3:
-            if time is None:
-                T = numpy.ma.array(fid.variables[var][:, :, :]).squeeze()
-            else:
-                T = numpy.ma.array(fid.variables[var][time, :, :]).squeeze()
-            T = T[::subsample, ::subsample]
-        elif ndim == 4:
-            if time is None:
-                if depth is None:
-                    T = numpy.ma.array(fid.variables[var][:, :, :, :]).squeeze()
-                else:
-                    T = numpy.ma.array(fid.variables[var][:, depth, :,
-                                    :]).squeeze()
-            elif depth is None:
-                T = numpy.ma.array(fid.variables[var][time, :, :, :]).squeeze()
-            else:
-                T = numpy.ma.array(fid.variables[var][time, depth, :,
-                                :]).squeeze()
-            T = T[::subsample, ::subsample]
-    else:
-        if ndim == 1:
-            T = numpy.ma.array(fid.variables[var][index]).squeeze()
-            T = T[::subsample]
-        elif ndim == 2:
-            T = numpy.ma.array(fid.variables[var][index]).squeeze()
-            T = T[::subsample, ::subsample]
-        elif ndim == 3:
-            if time is None:
-                U = numpy.ma.array(fid.variables[var][:, :, :]).squeeze()
-                T = U[:, index]
-            else:
-                U = numpy.ma.array(fid.variables[var][time, :, :]).squeeze()
-                T = U[index]
-            T = T[::subsample, ::subsample]
-        elif ndim == 4:
-            if time is None:
-                if depth is None:
-                    U = numpy.ma.array(fid.variables[var][:, :, :, :]).squeeze()
-                    T = U[:, :, index]
-                else:
-                    U = numpy.ma.array(fid.variables[var][:, depth, :,
-                                    :]).squeeze()
-                    T = U[:, index]
-            elif depth is None:
-                U = numpy.ma.array(fid.variables[var][time, :, :, :]).squeeze()
-                T = U[:, index]
-            else:
-                U = numpy.ma.array(fid.variables[var][time, depth, :,
-                                :]).squeeze()
-                T = U[index]
-            T = T[::subsample, ::subsample]
-
+    T = numpy.ma.array(fid.variables[var][:], dtype='float16')
+    if ndim == 1:
+        if index is None:
+            T = T[index]
+        T = T[::subsample]
+    elif ndim == 2:
+        if index is not None:
+            T = T[index]
+        T = T[::subsample, ::subsample]
+    elif ndim == 3:
+        T = T[:, index]
+        if time is not None:
+            T = T[time, :, :]
+        T = T[:, ::subsample, ::subsample]
+    elif ndim == 4:
+        T = T[:, :, index]
+        T = T[:, depth, :, :].squeeze()
+        if time is not None:
+            T = T[time, :, :]
+        T = T[:, ::subsample, ::subsample]
     fid.close()
 
     # - Mask value that are NaN
@@ -139,14 +100,14 @@ def read_var(filename, var, index=None, time=0, depth=0, subsample=1,
     return T
 
 
-def read_time(filename, ntime, itime=None):
+def read_time(filename, ntime, time=None):
     # - Open Netcdf file
     fid = netCDF4.Dataset(filename, 'r')
 
     # - Read time variable and units
-    time = fid.variables[ntime][:]
-    if itime is not None:
-        time = time[itime]
+    vtime = fid.variables[ntime][:]
+    if time is not None:
+        vtime = vtime[time]
     time_units = fid[ntime].units
 
     # - Try to read calendar
@@ -155,9 +116,9 @@ def read_time(filename, ntime, itime=None):
     except AttributeError:
         logger.warn('No calendar in time attributes, standard calendar used')
         time_cal = u"gregorian"
-    time = netCDF4.num2date(time, units=time_units, calendar=time_cal)
+    vtime = netCDF4.num2date(vtime, units=time_units, calendar=time_cal)
     fid.close()
-    return time
+    return vtime
 
 
 class velocity_netcdf():
@@ -202,7 +163,7 @@ class velocity_netcdf():
         self.lon, self.lat = (self.lon0[:], self.lat0[:])
         return None
 
-    def read_vel(self, index=None, time=0, missing_value=None,
+    def read_vel(self, index=None, time=None, depth=0, missing_value=None,
                  size_filter=None, slice_xy=None):
         '''Read data velocity'''
         if slice_xy is None:
@@ -210,10 +171,10 @@ class velocity_netcdf():
         else:
             self.slice_x = slice_xy[0]
             self.slice_y = slice_xy[1]
-        varu = read_var(self.file, self.nvaru, index=None, time=0,
-                        depth=0, missing_value=missing_value)
-        varv = read_var(self.file, self.nvarv, index=None, time=0,
-                        depth=0, missing_value=missing_value)
+        varu = read_var(self.file, self.nvaru, index=None, time=time,
+                        depth=depth, missing_value=missing_value)
+        varv = read_var(self.file, self.nvarv, index=None, time=time,
+                        depth=depth, missing_value=missing_value)
         if size_filter is not None:
             varu = filters.gaussian_filter(varu, sigma=size_filter)
             varv = filters.gaussian_filter(varv, sigma=size_filter)
@@ -223,8 +184,8 @@ class velocity_netcdf():
             else:
                 self.slice_x = slice_xy[0]
                 self.slice_y = slice_xy[1]
-            varu = varu[self.slice_y, self.slice_x]
-            varv = varv[self.slice_y, self.slice_x]
+            varu = varu[:, self.slice_y, self.slice_x]
+            varv = varv[:, self.slice_y, self.slice_x]
         else:
             self.slice_x = None
             self.slice_y = None
@@ -234,7 +195,7 @@ class velocity_netcdf():
         self.varv._sharedmask = False
         return None
 
-    def read_var(self, index=None, time=0, missing_value=None,
+    def read_var(self, index=None, depth=0, time=None, missing_value=None,
                  slice_xy=None, size_filter=None):
         '''Read data variable'''
         if slice_xy is None:
@@ -242,8 +203,8 @@ class velocity_netcdf():
         else:
             self.slice_x = slice_xy[0]
             self.slice_y = slice_xy[1]
-        var = read_var(self.file, self.nvar, index=None, time=0, depth=0,
-                            missing_value=missing_value)
+        var = read_var(self.file, self.nvar, index=None, time=time,
+                       depth=depth, missing_value=missing_value)
         if self.box is not None:
             if slice_xy is None:
                 self.slice_x, self.slice_y = self.read_coord()
@@ -254,9 +215,9 @@ class velocity_netcdf():
         self.var = var
         return None
 
-    def read_time(self, index=None, time=0):
+    def read_time(self, time=None):
         '''Read data time'''
-        self.time = read_time(self.file, self.ntime)
+        self.time = read_time(self.file, self.ntime, time=time)
         return None
 
 
@@ -405,7 +366,7 @@ class tracer_netcdf():
         return None
 
 
-def read_trajectory(infile, list_var):
+def read_trajectory(infile:str, list_var: list) -> dict:
     dict_var = {}
     fid = netCDF4.Dataset(infile, 'r')
     for key in list_var:
@@ -417,43 +378,31 @@ def read_trajectory(infile, list_var):
     return dict_var
 
 
-def interp_vel(VEL, save_s=False, save_ow=False, save_rv=False,) -> dict:
+def interp_vel(VEL:dict, coord:dict) -> dict:
     interp2d = scipy.interpolate.interp2d
-    _inte_u = None
-    _inte_v = None
-    _inte_h = None
-    _inte_sn = None
-    _inte_ss = None
-    _inte_rv = None
-    if len(numpy.shape(VEL.u)) > 2:
-        _inte_u = []
-        _inte_v = []
-        _inte_h = []
-        _inte_sn = []
-        _inte_ss = []
-        _inte_rv = []
-        for t in range(numpy.shape(VEL.u)[0]):
-            _inte_u.append(interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u[t, :, :]))
-            _inte_v.append(interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v[t, :, :]))
-            _inte_h.append(interp2d(VEL.Vlonu, VEL.Vlatv, VEL.h[t, :, :]))
-            if save_s is True or save_ow is True:
-                _inte_sn.append(interp2d(VEL.Vlonu, VEL.Vlatv,
-                                         VEL.Sn[t, :, :]))
-                _inte_ss.append(interp2d(VEL.Vlonu, VEL.Vlatv,
-                                         VEL.Ss[t, :, :]))
-            if save_rv is True or save_ow is True:
-                _inte_rv.append(interp2d(VEL.Vlonu, VEL.Vlatv,
-                                         VEL.RV[t, :, :]))
-    else:
-        _inte_u = list([interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u), ])
-        _inte_v = list([interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v), ])
-        _inte_h = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.h), ])
-        if save_s is True or save_ow is True:
-            _inte_sn = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.Sn), ])
-            _inte_ss = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.Ss), ])
-        if save_rv is True or save_ow is True:
-            _inte_rv = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.RV), ])
+    _inte = {}
+    _inte['time'] = coord['time']
+    for key in VEL.keys():
+        _inte[key] = None
+        VEL[key]['array'][numpy.isnan(VEL[key]['array'])] = 0
+    if len(numpy.shape(VEL['u']['array'])) > 2:
+        for key in VEL.keys():
+            _inte[key] = []
+        for t in range(len(coord['time'])):
+            for key in VEL.keys():
+                nlon = VEL[key]['lon']
+                nlat = VEL[key]['lat']
+                _indlon = numpy.where(nlon == 170.125)
+                _indlat = numpy.where(nlat == 25.875)
 
-    dic_interp = {'u': _inte_u, 'v': _inte_v, 'h': _inte_h,
-                  'sn': _inte_sn, 'ss': _inte_ss, 'rv': _inte_rv}
-    return dic_interp
+                _tmp = interp2d(nlon, nlat,
+                                VEL[key]['array'][t, :, :])
+                _inte[key].append(_tmp)
+    else:
+        for key in VEL.keys():
+            nlon = VEL[key]['lon']
+            nlat = VEL[key]['lat']
+            _tmp = interp2d(nlon, nlat,
+                            VEL[key]['array'][t, :, :])
+            _inte[key] = list([_tmp, ])
+    return _inte

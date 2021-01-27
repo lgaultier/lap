@@ -1,3 +1,21 @@
+'''
+#-----------------------------------------------------------------------
+#                       Additional Documentation
+# Author: Lucile Gaultier
+#
+# Modification History:
+# - Jan 2015:  Original by Lucile Gaultier
+# - Feb 2015: Version 1.0
+# - Dec 2015: Version 2.0
+# - Dec 2017: Version 3.0
+# - Jan 2021: Version 4.0
+# Notes:
+# - Written for Python 3.4, tested with Python 3.6
+#
+# Copyright (c)
+#-----------------------------------------------------------------------
+'''
+
 import datetime
 from typing import Optional, Tuple
 import numpy
@@ -27,6 +45,7 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
     num_pa = numpy.shape(npa_lon)
     mask = 0
     r = numpy.zeros((2, 1))
+    tadvection = (p.first_date - p.last_date).total_seconds() / 86400
     for i in range(num_pa[0]):
         lonpa = + npa_lon[i]
         latpa = + npa_lat[i]
@@ -34,10 +53,24 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
             npa_lon[i] = []
             npa_lat[i] = []
         dt = 0
-        while dt < abs(p.tadvection):
+        while dt < abs(tadvection):
+			# Index in velocity array, set to 0 if stationary
+			curdate = p.first_date + datetime.timedelta(seconds=dt*86400)
+			_diff = (numpy.datetime64(curdate) - dic_vel['time'])
+			ind_t = numpy.argmin(abs(_diff), out=None)
+			if dic_vel['time'][ind_t] > numpy.datetime64(curdate) :
+				ind_t = max(0, ind_t - 1)
+			if ind_t > len(dic_vel['time']) - 1:
+				break
+			dt_vel = ((numpy.datetime64(curdate) - dic_vel['time'][ind_t])
+				      / (dic_vel['time'][ind_t + 1] - dic_vel['time'][ind_t]))
+			if p.stationary:
+				ind_t = 0
+				dt_vel = 0
+
             # # TODO: retrieve index t in velocity
             _adv = mod_advection.advection_pa_timestep_np
-            advect = _adv(p, lonpa, latpa, dt, mask, r,
+            advect = _adv(p, lonpa, latpa, dt_vel, ind_t, mask, r,
                           dic_vel['u'], dic_vel['v'])
             lonpa, latpa, mask = advect
             dt += p.adv_time_step
@@ -136,11 +169,11 @@ def fsle_pa(lon: numpy.ndarray, lat: numpy.ndarray, df: float, d0: float,
 def run_lyapunov(p):
     tools.make_default(p)
     logger.info('Loading Velocity')
-    VEL = mod_io.read_velocity(p)
-    lyapunov(p, VEL)
+    VEL, coord = rr.read_velocity(p)
+    lyapunov(p, VEL, coord)
 
 
-def lyapunov(p, VEL):
+def lyapunov(p, VEL, coord):
     # - Initialize variables from parameter file
     # ------------------------------------------
     tools.make_default(p)
@@ -177,9 +210,8 @@ def lyapunov(p, VEL):
     # Read velocity
     dic_vel = None
     if rank == 0:
-        dic_vel = utils.interp_vel(VEL)
+        dic_vel = utils.interp_vel(VEL, coord)
     if p.parallelisation is True:
-        VEL = comm.bcast(VEL, root=0)
         dic_vel = comm.bcast(dic_vel, root=0)
 
     # For each point in Grid

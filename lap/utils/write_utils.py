@@ -205,6 +205,9 @@ def write_listracer_1d(wfile, T, p, listTr):
     exportables = [k for k in dir(p) if not k.startswith('__')]
     str_params = [f'{k}={getattr(p, k)}' for k in exportables]
     fid.comment = ' '.join(str_params)
+    strtime = '%Y-%m-%dT%H:%M:%SZ'
+    fid.time_coverage_start = p.first_date.strftime(strtime)
+    fid.time_coverage_end = p.last_date.strftime(strtime)
 
     # - Create dimensions
     dim_part = 'obs'
@@ -229,7 +232,7 @@ def write_listracer_1d(wfile, T, p, listTr):
         vtime = fid.createVariable('time_hr', 'f4', (dim_time_hr))
 
         vtime[:] = T['time_hr']
-        vtime.units = "days"
+        vtime.units = "days since start of advection"
         vtime.long_name = ('High temporal resolution time from the reference'
                            'time')
         if p.save_U is True:
@@ -266,15 +269,17 @@ def write_listracer_1d(wfile, T, p, listTr):
 
     vlon = fid.createVariable('lon', 'f4', (dim_time, dim_part),
                               fill_value=fill_value)
+    vlon.units = "deg E"
+    vlon.long_name = 'longitude'
     vlat = fid.createVariable('lat', 'f4', (dim_time, dim_part),
                               fill_value=fill_value)
+    vlat.units = "deg N"
+    vlat.long_name = 'latitude'
     vtime = fid.createVariable('time', 'f4', (dim_time), fill_value=fill_value)
     vlon[:, :] = T['lon_lr']
-    vlon.units = "deg E"
     vlat[:, :] = T['lat_lr']
-    vlat.units = "deg N"
-    vtime[:] = T['time']
-    vlon.units = "days"
+    vtime[:] = T['time_lr'][:]
+    vtime.units = "days since start of advection"
     vmask = fid.createVariable('mask_lr', 'f4', (dim_time, dim_part))
     vmask[:, :] = T['mask_lr']
     if p.list_tracer is not None:

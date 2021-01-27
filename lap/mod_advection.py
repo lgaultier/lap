@@ -4,6 +4,7 @@ from scipy.stats import norm
 import math
 import lap.const as const
 import lap.utils.tools as tools
+import datetime
 
 
 def init_random_walk(sizeadvection: int, time_step: float, scale: float
@@ -93,26 +94,25 @@ def init_full_traj(p, s0: int, s1: int):
 
 
 def advection_pa_timestep_np(p, lonpa: float, latpa: float, dt: float,
-                             mask: float, rk: float, _interp_u: list,
+                             interp_dt:int,
+                             mask: bool, rk: float, _interp_u: list,
                              _interp_v: list
                              ) -> Tuple[float, float, float, float, float]:
 
     # TODO boundary condition
     # Temporal interpolation  for velocity
     if type(_interp_u) is list and len(_interp_u) > 1:
-        interp_dt = int(dt / p.vel_step)
-        mod_t = numpy.mod(dt, p.vel_step)
-        _interp_ut = (_interp_u[interp_dt](lonpa, latpa) * (p.vel_step - mod_t)
-                      + _interp_u[interp_dt+1](lonpa, latpa)
-                      * mod_t) / p.vel_step
-        _interp_vt = (_interp_v[interp_dt](lonpa, latpa) * (p.vel_step - mod_t)
-                      + _interp_v[interp_dt+1](lonpa, latpa)
-                      * mod_t) / p.vel_step
+        _interp_ut = (_interp_u[interp_dt](lonpa, latpa) * (1 - dt)
+                      + _interp_u[interp_dt+1](lonpa, latpa) * dt)
+        _interp_vt = (_interp_v[interp_dt](lonpa, latpa) * (1 - dt)
+                      + _interp_v[interp_dt+1](lonpa, latpa) * dt)
     else:
         _interp_ut = _interp_u[0](lonpa, latpa)
         _interp_vt = _interp_v[0](lonpa, latpa)
     dlondt = numpy.sign(p.tadvection) * _interp_ut
     dlatdt = numpy.sign(p.tadvection) * _interp_vt
+    if dlondt == 0 or dlatdt == 0:
+        mask = True
     # TODO
     # Set velocity to 0 if particle is outside domain
     # if (rlonu < 0 or rlonu > 1 or rlatu < 0 or rlatu > 1
@@ -143,37 +143,41 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
               size: Optional[int] = 1, AMSR=None):
     # # Initialize listGrid and step
     if listGr is None:
-        listGr = [grid, ]
+        listGr = []
         grid.dlon = 10.
         grid.dlat = 10.
     # # Initialize empty matrices
-    sizeadvection = int(abs(p.tadvection) / p.output_step)
-    shape_lr = (sizeadvection + 2, i1 - i0)
+    tadvection = (p.first_date - p.last_date).total_seconds() / 86400
+    sizeadvection = int(abs(tadvection) / p.output_step)
+    shape_lr = (sizeadvection + 1, i1 - i0)
+    shape_hr = int(numpy.ceil(sizeadvection / p.adv_time_step) + 1)
     lon_lr = numpy.empty(shape_lr)
     lat_lr = numpy.empty(shape_lr)
-    mask_lr = numpy.ones(shape_lr, dtype=bool)
+    time_lr = numpy.empty((shape_lr[0]))
+    mask_lr = numpy.full(shape_lr, True, dtype=bool)
     for Trac in listGr:
         Trac.newi = numpy.zeros((2, shape_lr[0], shape_lr[1]))
         Trac.newj = numpy.zeros((2, shape_lr[0], shape_lr[1]))
     # # Loop on particles
-    first_day = (p.first_day - p.reference).total_seconds() / 86400.
+    first_day = (p.first_date - p.reference).total_seconds() / 86400.
     for pa in part:
         # # - Initialize final variables
         lonpa = + grid.lon1d[pa]
         latpa = + grid.lat1d[pa]
         lon_lr[0, pa - i0] = + lonpa
         lat_lr[0, pa - i0] = + latpa
+        time_lr[0] = + 0
+        mask_lr[0, pa - i0] = grid.mask1d[pa - i0]
         if p.save_traj is True:
             vlonpa = [lonpa, ]
             vlatpa = [latpa, ]
-            vtime = [first_day, ]
             vu = [0, ]
             vh = [0, ]
             vv = [0, ]
             vS = [0, ]
             vOW = [0, ]
             vRV = [0, ]
-            vmask = [1, ]
+            vmask = [grid.mask1d[pa - i0], ]
         for Trac in listGr:
             Trac.newj0 = numpy.argmin(abs(Trac.lon - lonpa), axis=1)[0]
             Trac.newi0 = numpy.argmin(abs(Trac.lat - latpa), axis=0)[0]
@@ -189,8 +193,11 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
             Trac.newi[0, 0, pa - i0] = Trac.newi0
             Trac.newj[0, 0, pa - i0] = Trac.newj0
 
+        tstop = int(abs(tadvection) / p.output_step) + p.adv_time_step
+        if not grid.mask1d[pa - i0]:
+            vtime = [0, ]
         # # - Compute trajectory and tracer value if tracer is not NAN
-        if not math.isnan(grid.mask1d[pa - i0]):
+        # if not math.isnan(grid.mask1d[pa - i0]):
             # # - Compute initial location and grid size
             # Define random_walk
             if p.scale is not None:
@@ -215,19 +222,29 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
 
             # # - Loop on the number of advection days
             # # Change the output step ?
-            mask = 0
-            tstop = int(abs(p.tadvection) / p.output_step + 1)
-            for t in numpy.arange(0, tstop, p.adv_time_step):
+            mask = False
+            tmod_lr = 1
+            tout = 1
+            for t in numpy.arange(p.adv_time_step, tstop, p.adv_time_step):
                 # dt = t % p.vel_step
                 # Index for random walk
                 k = int(t)
                 # Index in velocity array, set to 0 if stationary
-                ind_t = + int(t / p.vel_step)
+                curdate = p.first_date + datetime.timedelta(seconds=t*86400)
+                _diff = (numpy.datetime64(curdate) - dic['time'])
+                ind_t = numpy.argmin(abs(_diff), out=None)
+                if dic['time'][ind_t] > numpy.datetime64(curdate) :
+                    ind_t = max(0, ind_t - 1)
+                if ind_t > len(dic['time']) - 1:
+                    break
+                dt = ((numpy.datetime64(curdate) - dic['time'][ind_t])
+                       / (dic['time'][ind_t + 1] - dic['time'][ind_t]))
                 if p.stationary:
                     ind_t = 0
+                    dt = 0
                 # while dt < p.output_step:
                 rk = r[:, k]
-                advect = advection_pa_timestep_np(p, lonpa, latpa, t, mask,
+                advect = advection_pa_timestep_np(p, lonpa, latpa, dt, ind_t, mask,
                                                   rk, dic['u'], dic['v'])
                 lonpa, latpa, mask, dlondt, dlatdt = advect
                 if p.stationary is True:
@@ -235,7 +252,8 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
                         ums = dic['u'][0](lonpa, latpa)
                     if p.save_V is True:
                         vms = dic['v'][0](lonpa, latpa)
-                    H = dic['h'][0](lonpa, latpa)
+                    if 'h' in dic.keys():
+                        H = dic['h'][0](lonpa, latpa)
                     if p.save_S is True or p.save_OW is True:
                         Sn = dic['sn'][0](lonpa, latpa)
                         Ss = dic['ss'][0](lonpa, latpa)
@@ -243,11 +261,12 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
                         RVtmp = dic['rv'][0](lonpa, latpa)
                 else:
                     if p.save_U is True:
-                        ums = dic['u'][ind_t](lonpa, latpa)
+                        ums = dic['ums'][ind_t](lonpa, latpa)
                     if p.save_V is True:
-                        vms = dic['v'][ind_t](lonpa, latpa)
+                        vms = dic['vms'][ind_t](lonpa, latpa)
                     # TODO temporal interpolation
-                    H = dic['h'][ind_t](lonpa, latpa)
+                    if 'h' in dic.keys():
+                        H = dic['h'][ind_t](lonpa, latpa)
                     if p.save_S is True or p.save_OW is True:
                         Sn = dic['sn'][ind_t](lonpa, latpa)
                         Ss = dic['ss'][ind_t](lonpa, latpa)
@@ -263,12 +282,10 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
                 if p.save_traj is True:
                     vlonpa.append(lonpa)
                     vlatpa.append(latpa)
-                    time = (first_day + (t * p.output_step)
-                            * p.tadvection / float(sizeadvection))
-                    vtime.append(time)
+                    vtime.append(t)
                     vu.append(ums)
                     vv.append(vms)
-                    vh.append(H)
+                    #vh.append(H)
                     vmask.append(mask)
                     if p.save_S is True:
                         vS.append(Stmp)
@@ -284,21 +301,25 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
                         vOW = 0
                 # k += 1
                 # -- Store new longitude and new latitude at each output_step
-                if (t % p.output_step + p.adv_time_step > 1):
-                    lon_lr[int(t) + 1, pa - i0] = lonpa
-                    lat_lr[int(t) + 1, pa - i0] = latpa
-                    mask_lr[int(t) + 1, pa - i0] = mask
-                    timetmp = int(t) + 1
+                if (t > tout):
+                    lon_lr[tmod_lr, pa - i0] = lonpa
+                    lat_lr[tmod_lr, pa - i0] = latpa
+                    mask_lr[tmod_lr, pa - i0] = mask
+                    time_lr[tmod_lr] = t
+
                     if listGr is not None:
-                        find_indice_tracer(listGr, lon_lr[timetmp, pa - i0],
-                                           lat_lr[timetmp, pa - i0],
-                                           timetmp, pa - i0)
+                        find_indice_tracer(listGr, lon_lr[tmod_lr, pa - i0],
+                                           lat_lr[tmod_lr, pa - i0],
+                                           tmod_lr, pa - i0)
+                    tmod_lr += 1
+                    tout += p.output_step
         else:
             # If particle does not exist, set all values to fill_value
             timetmp = 1
-            lon_lr[:, pa - i0] = p.fill_value
-            lat_lr[:, pa - i0] = p.fill_value
-            mask_lr[:, pa - i0] = 1
+            lon_lr[:, pa - i0] = [p.fill_value, ] * shape_lr[0]
+            lat_lr[:, pa - i0] = [p.fill_value, ] * shape_lr[0]
+            mask_lr[:, pa - i0] = [True, ] * shape_lr[0]
+            #time_lr[:] =  [p.fill_value, ] * shape_lr[0]
             if listGr is not None:
                 for Trac in listGr:
                     Trac.newi[0, :, pa - i0] = p.fill_value
@@ -309,23 +330,25 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
             tools.update_progress(perc, f'{pa} particles', f'{rank} node')
         if p.save_traj:
             if pa == i0:
-                init = init_full_traj(p, numpy.shape(vlonpa)[0], i1 - i0)
+                #init = init_full_traj(p, numpy.shape(vlonpa)[0], i1 - i0)
+                init = init_full_traj(p, shape_hr, i1 - i0)
 
                 lon_hr, lat_hr, mask_hr, S_hr, RV_hr, OW_hr, u_hr, v_hr, h_hr = init
-            _cond = (vlonpa[0] != vlonpa[1] or vlatpa[0] != vlatpa[1]
-                     or (not numpy.array(vmask).all()))
+            #_cond = (vlonpa[0] != vlonpa[1] or vlatpa[0] != vlatpa[1]
+            #         or (not numpy.array(vmask).all()))
+            _cond =  (not numpy.array(vmask).all())
             if _cond:
                 lon_hr[:, pa - i0] = numpy.transpose(vlonpa)
                 lat_hr[:, pa - i0] = numpy.transpose(vlatpa)
                 mask_hr[:, pa - i0] = numpy.transpose(vmask)
             else:
-                lon_hr[:, pa - i0] = p.fill_value
-                lat_hr[:, pa - i0] = p.fill_value
-                mask_hr[:, pa - i0] = 1
+                lon_hr[:, pa - i0] = [p.fill_value, ] * shape_hr
+                lat_hr[:, pa - i0] = [p.fill_value, ] * shape_hr
+                mask_hr[:, pa - i0] = [True, ] * shape_hr
             if p.save_U is True:
                 u_hr[:, pa - i0] = numpy.transpose(vu)
                 v_hr[:, pa - i0] = numpy.transpose(vv)
-                h_hr[:, pa - i0] = numpy.transpose(vh)
+                #h_hr[:, pa - i0] = numpy.transpose(vh)
             if p.save_S is True:
                 S_hr[:, pa - i0] = numpy.transpose(vS)
             if p.save_RV is True:
@@ -344,13 +367,12 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
         dict_output['h_hr'] = h_hr
         dict_output['OW_hr'] = OW_hr
         dict_output['RV_hr'] = RV_hr
-        dict_output['lon_lr'] = lon_lr
-        dict_output['lat_lr'] = lat_lr
-        dict_output['time_hr'] = vtime
+        dict_output['time_hr'] = numpy.arange(0, tstop, p.adv_time_step)
         dict_output['mask_hr'] = mask_hr
     dict_output['lon_lr'] = lon_lr
     dict_output['lat_lr'] = lat_lr
     dict_output['mask_lr'] = mask_lr
+    dict_output['time_lr'] = time_lr
 
     return dict_output
 

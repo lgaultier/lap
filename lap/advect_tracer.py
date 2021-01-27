@@ -17,6 +17,8 @@
 '''
 
 import datetime
+from typing import Optional, Tuple
+import sys
 import lap.utils.tools as tools
 import lap.mod_io as mod_io
 import lap.mod_advection as mod_advection
@@ -55,6 +57,13 @@ def tracer_advection(p, Tr, VEL, AMSRgrid=None):
 
 
 def run_tracer_advection(p):
+    tools.make_default(p)
+    logger.info('Loading Velocity')
+    VEL, coord = mod_io.read_velocity(p)
+    tracer_advection(p, VEL, coord)
+
+
+def tracer_advection(p):
     # - Initialize variables from parameter file
     # ------------------------------------------
     tools.make_default(p)
@@ -104,19 +113,6 @@ def run_tracer_advection(p):
         else:
             listTr = None
             listGr = None
-
-        # if p.tracer_type == 'netcdf':
-        #     Tr = mod_io.Read_tracer_hr(p)
-        # elif p.tracer_type == 'AMSR':
-        #     Tr = mod_io.Read_amsr(p)
-        # elif p.tracer_type == 'MODIS':
-        #     j0 = 7900
-        #     j1 = 8150
-        #     i0 = 1250
-        #     i1 = 1550
-        #     Tr = mod_io.Read_modis_hr(p, i0, i1, j0, j1)
-        # elif p.tracer_type == 'MODEL':
-        #     Tr = mod_io.Read_tracer_model(p)
     else:
         Tr = None
     if p.parallelisation is True:
@@ -126,8 +122,12 @@ def run_tracer_advection(p):
 
     # - Read velocity
     if rank == 0:
+        VEL = utils.interp_vel(VEL, coord)
         logger.info('Loading Velocity')
-    VEL = mod_io.read_velocity(p)
+    if p.parallelisation is True:
+        VEL = comm.bcast(VEL, root=0)
+        dic_vel = comm.bcast(dic_vel, root=0)
+
 
     # - Read AMSR if nudging
     # TODO check loading of AMSR data
