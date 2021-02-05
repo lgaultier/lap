@@ -118,19 +118,27 @@ def read_velocity(p, get_time=None):
     IDL = check_crossing(p.box[0], p.box[1])
     if IDL is True:
         ds = ds.sortby(numpy.mod(ds.longitude + 360, 360))
-        VEL = ds.sel(depth=0, latitude=slice(p.box[2], p.box[3]),
-                    )
+        if p.depth is not None:
+            VEL = ds.sel(depth=p.depth, latitude=slice(p.box[2], p.box[3]))
+        else:
+            VEL = ds.sel(latitude=slice(p.box[2], p.box[3]))
     else:
-        VEL = ds.sel(depth=0, latitude=slice(p.box[2], p.box[3]),
-                     longitude=slice(p.box[0], p.box[1]))
+        if p.depth is not None:
+            VEL = ds.sel(depth=p.depth, latitude=slice(p.box[2], p.box[3]),
+                         longitude=slice(p.box[0], p.box[1]))
+        else:
+            VEL = ds.sel(latitude=slice(p.box[2], p.box[3]),
+                         longitude=slice(p.box[0], p.box[1]))
     # Intialize empty matrices
     ds.close()
     del ds
     tlength = (p.last_date - p.first_date).total_seconds()
     coord = {}
     dic = {}
-    coord['lonu'] = numpy.mod(VEL.longitude[:].values + 360., 360.)
-    coord['latu'] = VEL.latitude[:].values
+    lon_ctor = getattr(VEL, p.name_lon)
+    lat_ctor = getattr(VEL, p.name_lat)
+    coord['lonu'] = numpy.mod(lon_ctor[:].values + 360., 360.)
+    coord['latu'] = lat_ctor[:].values
     coord['lonv'] = numpy.mod(VEL.longitude[:].values + 360., 360.)
     coord['latv'] = VEL.latitude[:].values
     # TODO check this format?
@@ -147,20 +155,23 @@ def read_velocity(p, get_time=None):
     coord['time'] = VEL.time.values
     # Mask data
     #VEL.fillna(0)
-    dic['ums'] = {'array': VEL.uo.values, 'lon': coord['lonu'], 'lat': coord['latu']}
-    dic['vms'] = {'array': VEL.vo.values, 'lon': coord['lonv'], 'lat': coord['latv']}
-    dic['u'] = {'array': numpy.zeros(VEL.uo.shape), 'lon': coord['lonu'],
+    uo_ctor = getattr(VEL, p.name_u)
+    vo_ctor = getattr(VEL, p.name_v)
+    dic['ums'] = {'array': uo_ctor.values, 'lon': coord['lonu'], 'lat': coord['latu']}
+    dic['vms'] = {'array': vo_ctor.values, 'lon': coord['lonv'], 'lat': coord['latv']}
+    dic['u'] = {'array': numpy.zeros(uo_ctor.shape), 'lon': coord['lonu'],
                   'lat': coord['latu']}
-    dic['v'] = {'array': numpy.zeros(VEL.vo.shape), 'lon': coord['lonv'],
+    dic['v'] = {'array': numpy.zeros(vo_ctor.shape), 'lon': coord['lonv'],
                   'lat': coord['latv']}
     if p.name_h is not None:
-        dic['h'] = {'array': VEL.adt, 'lon': coord['lonu'], 'lat': coord['latv']}
+        ho_ctor = getattr(VEL, p.name_h)
+        dic['h'] = {'array': ho_ctor, 'lon': coord['lonu'], 'lat': coord['latv']}
     if p.save_S or p.save_RV or p.save_OW:
-        dic['sn'] = {'array': numpy.zeros(VEL.uo.shape), 'lon': coord['lonu'],
+        dic['sn'] = {'array': numpy.zeros(uo_ctor.shape), 'lon': coord['lonu'],
                      'lat': coord['latv']}
-        dic['ss'] = {'array': numpy.zeros(VEL.uo.shape), 'lon': coord['lonu'],
+        dic['ss'] = {'array': numpy.zeros(uo_ctor.shape), 'lon': coord['lonu'],
                      'lat': coord['latv']}
-        dic['rv'] = {'array': numpy.zeros(VEL.uo.shape), 'lon': coord['lonu'],
+        dic['rv'] = {'array': numpy.zeros(uo_ctor.shape), 'lon': coord['lonu'],
                      'lat': coord['latv']}
 
     for t in range(VEL.time.shape[0]):
@@ -250,26 +261,26 @@ def Read_amsr_t(p):
 
 
 def write_drifter(p, drifter, listTr, idf=False):
-    start = p.first_day.strftime('%Y%m%d')
-    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    start = p.first_date.strftime('%Y%m%d')
+    stop = p.first_date + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
     file_default = f'Advection_{start}_{stop}_K{p.K}s{p.sigma}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     global_attr = idf_io.global_idf
-    global_attr['time_coverage_start'] = p.first_day.strftime(idf_io.idf_fmt)
+    global_attr['time_coverage_start'] = p.first_date.strftime(idf_io.idf_fmt)
     p.output = getattr(p, 'output', default_output)
     write_utils.write_listracer_1d(p.output, drifter, p, listTr)
 
 
 def write_diagnostic_2d(p, data, description='', **kwargs):
-    start = p.first_day.strftime('%Y%m%d')
-    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    start = p.first_date.strftime('%Y%m%d')
+    stop = p.first_date + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
     file_default = f'{p.out_pattern}_{start}_{stop}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     global_attr = idf_io.global_idf
-    global_attr['time_coverage_start'] = p.first_day.strftime(idf_io.idf_fmt)
-    _end = p.first_day + datetime.timedelta(days=1)
+    global_attr['time_coverage_start'] = p.first_date.strftime(idf_io.idf_fmt)
+    _end = p.first_date + datetime.timedelta(days=1)
     global_attr['time_coverage_end'] = _end.strftime(idf_io.idf_fmt)
     global_attr['idf_spatial_resolution'] = p.parameter_grid[5]*111110
     global_attr['idf_spatial_resolution_units'] = "m"
@@ -289,8 +300,8 @@ def write_diagnostic_2d(p, data, description='', **kwargs):
 
 
 def write_advected_tracer(p, data_out):
-    start = p.first_day.strftime('%Y%m%d')
-    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    start = p.first_date.strftime('%Y%m%d')
+    stop = p.first_date + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
     file_default = f'Advection_{start}_{stop}_K{p.K}s{p.sigma}.nc'
     default_output = os.path.join(p.output_dir, file_default)

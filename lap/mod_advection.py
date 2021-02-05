@@ -235,8 +235,9 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
                 ind_t = numpy.argmin(abs(_diff), out=None)
                 if dic['time'][ind_t] > numpy.datetime64(curdate) :
                     ind_t = max(0, ind_t - 1)
-                if ind_t > len(dic['time']) - 1:
-                    break
+                if ind_t > len(dic['time']) - 2:
+                    ind_t = max(0, ind_t - 1)
+                    #break
                 dt = ((numpy.datetime64(curdate) - dic['time'][ind_t])
                        / (dic['time'][ind_t + 1] - dic['time'][ind_t]))
                 if p.stationary:
@@ -503,7 +504,7 @@ def reordering(Tr, grid, AMSR, p):
 
 
 def reordering1d(p, listTr: list, listGr: list):
-    first_day = (p.first_day - p.reference).total_seconds() / 86400
+    first_day = (p.first_date - p.reference).total_seconds() / 86400
     if listGr:
         n2, nt, npa = numpy.shape(listGr[0].newi)
         nlist = len(listTr)
@@ -528,7 +529,7 @@ def reordering1d(p, listTr: list, listGr: list):
 
 def reordering1dmpi(p, listTr: list, listGr: list):
     tra = None
-    first_day = (p.first_day - p.reference).total_seconds() / 86400
+    first_day = (p.first_date - p.reference).total_seconds() / 86400
     if listGr:
         n2, nt, npa = numpy.shape(listGr[0].newi)
         nlist = len(listTr)

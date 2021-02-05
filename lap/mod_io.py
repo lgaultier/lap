@@ -75,7 +75,7 @@ def read_list_tracer(p, dict_tracer: dict) -> list:
     for tra in p.list_tracer:
         logger.info(f'Reading {tra}')
         i = 0
-        tref = p.first_day
+        tref = p.first_date
         # For each tracer Find first available data
         year, month, day = tools.jj2date(tref)
         tra_name = dict_tracer['name'][tra]
@@ -86,12 +86,12 @@ def read_list_tracer(p, dict_tracer: dict) -> list:
         pathfilet = os.path.join(p.tracer_input_dir, tra_dir, filet)
         # If no data is found, look for the previous step
         while ((not os.path.exists(pathfilet))
-                and abs(tref - p.first_day) <= tra_step):
+                and abs(tref - p.first_date) <= tra_step):
             tref -= 1
             year, month, day = tools.jj2date(tref)
             filet = f'{tra_name}{year:02d}{month:02d}{day:02d}.nc'
         # If no data is found in the previous step, there is no available data
-        if abs(tref - p.first_day) > tra_step:
+        if abs(tref - p.first_date) > tra_step:
             logger.error(f'Tracer files {tra} ({filet}) are not found')
             sys.exit(1)
         # Build list of tracer datasets which have to be collocated
@@ -131,7 +131,7 @@ def read_list_tracer(p, dict_tracer: dict) -> list:
 
 def read_list_grid(p, dict_tracer: dict) -> list:
     listTr = []
-    tref = p.first_day
+    tref = p.first_date
     # Loop on all tracer grid provided in the parameter file
     for tra in p.list_grid:
         logger.info(f'Reading {tra}')
@@ -146,13 +146,13 @@ def read_list_grid(p, dict_tracer: dict) -> list:
         pathfilet = os.path.join(p.tracer_input_dir, tra_dir, filet)
         # If no data is found, look for the previous step
         while (not os.path.exists(pathfilet)
-               and abs(jdate - p.first_day) <= tra_step):
+               and abs(jdate - p.first_date) <= tra_step):
             jdate -= 1
             year, month, day = tools.jj2date(jdate)
             filet = f'{tra_name}{year:04d}{month:02d}{day:02d}.nc'
             pathfilet = os.path.join(p.DIR, tra_dir, filet)
         # If no data is found in the previous step, there is no available data
-        if abs(jdate - p.first_day) > tra_step:
+        if abs(jdate - p.first_date) > tra_step:
             logger.error(f'Grid file {tra} does not exist')
             sys.exit(1)
         Tr = read_utils.tracer_netcdf(filename=pathfilet, var=tra_var,
@@ -528,26 +528,26 @@ def Read_amsr_t(p):
 
 
 def write_drifter(p, drifter, listTr, idf=False):
-    start = p.first_day.strftime('%Y%m%d')
-    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    start = p.first_date.strftime('%Y%m%d')
+    stop = p.first_date + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
     file_default = f'Advection_{start}_{stop}_K{p.K}s{p.sigma}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     global_attr = idf_io.global_idf
-    global_attr['time_coverage_start'] = p.first_day.strftime(idf_io.idf_fmt)
+    global_attr['time_coverage_start'] = p.first_date.strftime(idf_io.idf_fmt)
     p.output = getattr(p, 'output', default_output)
     write_utils.write_listracer_1d(p.output, drifter, p, listTr)
 
 
 def write_diagnostic_2d(p, data, description='', **kwargs):
-    start = p.first_day.strftime('%Y%m%d')
-    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    start = p.first_date.strftime('%Y%m%d')
+    stop = p.first_date + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
     file_default = f'{p.out_pattern}_{start}_{stop}.nc'
     default_output = os.path.join(p.output_dir, file_default)
     global_attr = idf_io.global_idf
-    global_attr['time_coverage_start'] = p.first_day.strftime(idf_io.idf_fmt)
-    _end = p.first_day + datetime.timedelta(days=1)
+    global_attr['time_coverage_start'] = p.first_date.strftime(idf_io.idf_fmt)
+    _end = p.first_date + datetime.timedelta(days=1)
     global_attr['time_coverage_end'] = _end.strftime(idf_io.idf_fmt)
     global_attr['idf_spatial_resolution'] = p.parameter_grid[5]*111110
     global_attr['idf_spatial_resolution_units'] = "m"
@@ -567,8 +567,8 @@ def write_diagnostic_2d(p, data, description='', **kwargs):
 
 
 def write_advected_tracer(p, data_out):
-    start = p.first_day.strftime('%Y%m%d')
-    stop = p.first_day + datetime.timedelta(days=p.tadvection)
+    start = p.first_date.strftime('%Y%m%d')
+    stop = p.first_date + datetime.timedelta(days=p.tadvection)
     stop = stop.strftime('%Y%m%d')
     file_default = f'Advection_{start}_{stop}_K{p.K}s{p.sigma}.nc'
     default_output = os.path.join(p.output_dir, file_default)

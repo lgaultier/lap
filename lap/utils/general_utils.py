@@ -110,7 +110,7 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
             data['time_hr'] = list_var_adv['time_hr']
             del list_var_adv['time_hr']
         tstep = p.tadvection / p.output_step / abs(p.tadvection)
-        first_day = (p.first_day - p.reference).total_seconds() / 86400
+        first_day = (p.first_date - p.reference).total_seconds() / 86400
         tstop = first_day + p.tadvection + tstep
         data['time'] = numpy.arange(first_day, tstop, tstep)
         for irank in range(0, size):
@@ -154,7 +154,7 @@ def gather_data(p, list_var_adv, listGr, listTr) -> dict:
     for key, value in list_var_adv.items():
         data[key] = list_var_adv[key]
     tstep = p.tadvection / p.output_step / abs(p.tadvection)
-    first_day = (p.first_day - p.reference).total_seconds() / 86400
+    first_day = (p.first_date - p.reference).total_seconds() / 86400
     tstop = first_day + p.tadvection + tstep
     data['time'] = numpy.arange(first_day, tstop, tstep)
     return data

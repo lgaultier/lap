@@ -27,7 +27,7 @@ box = [-180, 180, -10, 70]
 reference = datetime.datetime(1970, 1,1)
 first_day = datetime.datetime(2011,1 , 8) # 20819
 first_date= datetime.datetime(2014, 7, 1) # 20819
-last_date= datetime.datetime(2016,1, 1) # 20819
+last_date= datetime.datetime(2014,7, 8) # 20819
 strday = first_day.strftime('%Y%m%d')
 
 ## -- ADVECTION PARAMETER -- ## 
@@ -75,11 +75,7 @@ name_v = 'vo' #'vgos'
 # List of velocity files to use
 # List of velocity files to use
 
-list_date = [first_day + datetime.timedelta(x) for x in range(0, tadvection + 3, 1)]
-print(len(list_date))
-list_vel = [f'dt_global_allsat_phy_l4_{x.strftime("%Y%m%d")}_20190101.nc' for x in list_date]
 # Time step between two velocity files
-vel_step = 1.
 
 # -- OUTPUTS -- ##
 # Set value for nan
