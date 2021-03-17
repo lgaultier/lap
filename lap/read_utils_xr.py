@@ -29,6 +29,7 @@ def make_mask(p, VEL):
     Teval = interpolate.RectBivariateSpline(vlat, vlon,
                                             numpy.isnan(masku), kx=1, ky=1,
                                             s=0)
+
     return Teval
 
 
@@ -96,6 +97,7 @@ def sort_files(p):
     #                        " two grids: {frequency} seconds")
     return list_name, list_date, frequency[0]
 
+
 def check_crossing(lon1: float, lon2: float, validate: bool = True):
     """
     Assuming a minimum travel distance between two provided longitude,
@@ -108,7 +110,7 @@ def check_crossing(lon1: float, lon2: float, validate: bool = True):
     return abs(lon2 - lon1) > 180.0
 
 
-def read_velocity(p, get_time=None):
+def read_velocity(p, get_tie=None):
     # Make_list_velocity
     list_vel, list_date, freq = sort_files(p)
     # Read velocity
@@ -116,19 +118,46 @@ def read_velocity(p, get_time=None):
     ds = xarray.open_mfdataset(list_vel, concat_dim="time", combine="nested")
     #VEL = ds.sel(depth=0, latitude=slice(p.box[2], p.box[3]))
     IDL = check_crossing(p.box[0], p.box[1])
+    box = p.box
+    name_lon = p.name_lon
+    name_lat = p.name_lat
+    _box1 = p.box[1]
+    _box0 = p.box[0]
+    lon_ctor = getattr(ds, name_lon)
+    if (lon_ctor.values > 185).any():
+        _box0 = numpy.mod(box[0] + 360, 360)
+        _box1 = numpy.mod(box[1] + 360, 360)
+        if box[0] > box[1]:
+            IDL = True
+
+    #print(_box0, _box1, ds.longitude.values)
     if IDL is True:
-        ds = ds.sortby(numpy.mod(ds.longitude + 360, 360))
+        ds = ds.sortby(numpy.mod(lon_ctor + 360, 360))
         if p.depth is not None:
-            VEL = ds.sel(depth=p.depth, latitude=slice(p.box[2], p.box[3]))
+            if name_lat == 'lat':
+                VEL = ds.sel(depth=depth, lat=slice(box[2], box[3]))
+            else:
+                VEL = ds.sel(depth=p.depth, latitude=slice(p.box[2], p.box[3]))
         else:
-            VEL = ds.sel(latitude=slice(p.box[2], p.box[3]))
+            if name_lat == 'lat':
+                VEL = ds.sel(lat=slice(p.box[2], p.box[3]))
+            else:
+                VEL = ds.sel(latitude=slice(p.box[2], p.box[3]))
     else:
         if p.depth is not None:
-            VEL = ds.sel(depth=p.depth, latitude=slice(p.box[2], p.box[3]),
-                         longitude=slice(p.box[0], p.box[1]))
+            if name_lat == 'lat':
+                VEL = ds.sel(depth=p.depth, lat=slice(p.box[2], p.box[3]),
+                             lon=slice(_box0, _box1))
+            else:
+                VEL = ds.sel(depth=p.depth, latitude=slice(p.box[2], p.box[3]),
+                             longitude=slice(_box0, _box1))
         else:
-            VEL = ds.sel(latitude=slice(p.box[2], p.box[3]),
-                         longitude=slice(p.box[0], p.box[1]))
+            if name_lat == 'lat':
+                VEL = ds.sel(lat=slice(p.box[2], p.box[3]),
+                             lon=slice(_box0, _box1))
+            else:
+                VEL = ds.sel(latitude=slice(p.box[2], p.box[3]),
+                             longitude=slice(_box0, _box1))
     # Intialize empty matrices
     ds.close()
     del ds
@@ -139,10 +168,10 @@ def read_velocity(p, get_time=None):
     lat_ctor = getattr(VEL, p.name_lat)
     coord['lonu'] = numpy.mod(lon_ctor[:].values + 360., 360.)
     coord['latu'] = lat_ctor[:].values
-    coord['lonv'] = numpy.mod(VEL.longitude[:].values + 360., 360.)
-    coord['latv'] = VEL.latitude[:].values
+    coord['lonv'] = numpy.mod(lon_ctor[:].values + 360., 360.)
+    coord['latv'] = lat_ctor[:].values
     # TODO check this format?
-    if len(VEL.longitude.shape) == 2:
+    if len(lon_ctor.shape) == 2:
         lon2du, lat2du = (coord['lonu'], coord['latu'])
         lon2dv, lat2dv = (coord['lonv'], coord['latv'])
     else:
@@ -152,7 +181,9 @@ def read_velocity(p, get_time=None):
     # coord['lat2du'] = lat2du
     # coord['lon2dv'] = numpy.mod(lon2du + 360., 360.)
     # coord['lon2dv'] = lat2dv
-    coord['time'] = VEL.time.values
+    coord['time'] = [numpy.datetime64(x) for x in VEL.time.values]
+    coord['time'] = numpy.array(coord['time'])
+    #print(VEL.time.values)
     # Mask data
     #VEL.fillna(0)
     uo_ctor = getattr(VEL, p.name_u)

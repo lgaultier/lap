@@ -281,6 +281,8 @@ def make_grid(p, VEL, coord):
                      '(lon0, lon1, dlon, lat0, lat1, dlat)')
         sys.exit(1)
     # Build grid
+    lon0 = numpy.mod(lon0 + 360, 360)
+    lon1 = numpy.mod(lon1 + 360, 360)
     Tr = read_utils.initclass()
     lontmp = numpy.linspace(lon0, lon1, int((lon1 - lon0) / dlon))
     lattmp = numpy.linspace(lat0, lat1, int((lat1 - lat0) / dlat))
@@ -293,6 +295,9 @@ def make_grid(p, VEL, coord):
     # TODO create real mask
     #masktmp = numpy.zeros(shape_tra)
     Tr.mask = numpy.ma.getdata((masktmp > 0))
+    if numpy.ma.getdata(Tr.mask).all():
+        logger.info(f'no data in box {lon0}, {lon1}, {lat0}, {lat1}')
+        sys.exit(0)
     #Tr.mask = numpy.ma.getdata()
     return Tr
 
