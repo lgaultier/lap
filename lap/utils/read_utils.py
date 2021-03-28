@@ -19,6 +19,55 @@ logger = logging.getLogger(__name__)
 # -------------------#
 
 
+def geoloc_from_gcps(gcplon, gcplat, gcplin, gcppix, lin, pix):
+    """"""
+    import pyproj
+    geod = pyproj.Geod(ellps='WGS84')
+    fwd, bwd, dis = geod.inv(gcplon[:, :-1], gcplat[:, :-1],
+                             gcplon[:, 1:], gcplat[:, 1:])
+
+    # Find line and column for the top-left corner of the 4x4 GCPs cell which
+    # contains the requested locations
+    nlin, npix = gcplat.shape
+    _gcplin = gcplin[:, 0]
+    _gcppix = gcppix[0, :]
+    top_line = numpy.searchsorted(_gcplin, lin, side='right') - 1
+    left_column = numpy.searchsorted(_gcppix, pix, side='right') - 1
+
+    # Make sure this line and column remain within the matrix and that there
+    # are adjacent line and column to define the bottom-right corner of the 4x4
+    # GCPs cell
+    top_line = numpy.clip(top_line, 0, nlin - 2)
+    bottom_line = top_line + 1
+    left_column = numpy.clip(left_column, 0, npix - 2)
+    right_column = left_column + 1
+
+    # Compute coordinates of the requested locations in the 4x4 GCPs cell
+    line_extent = _gcplin[bottom_line] - _gcplin[top_line]
+    column_extent = _gcppix[right_column] - _gcppix[left_column]
+    line_rel_pos = (lin - _gcplin[top_line]) / line_extent
+    column_rel_pos = (pix - _gcppix[left_column]) / column_extent
+
+    # Compute geographical coordinates of the requested locations projected on
+    # the top and bottom lines
+    lon1, lat1, _ = geod.fwd(gcplon[top_line, left_column],
+                             gcplat[top_line, left_column],
+                             fwd[top_line, left_column],
+                             dis[top_line, left_column] * column_rel_pos)
+    lon2, lat2, _ = geod.fwd(gcplon[bottom_line, left_column],
+                             gcplat[bottom_line, left_column],
+                             fwd[bottom_line, left_column],
+                             dis[bottom_line, left_column] * column_rel_pos)
+
+    # Compute the geographical coordinates of the requested locations projected
+    # on a virtual column joining the projected points on the top and bottom
+    # lines
+    fwd12, bwd12, dis12 = geod.inv(lon1, lat1, lon2, lat2)
+    lon, lat, _ = geod.fwd(lon1, lat1, fwd12, dis12 * line_rel_pos)
+
+    return lon, lat
+
+
 def read_coordinates(filename, nlon, nlat, dd=True, subsample=1):
     ''' General routine to read coordinates in a netcdf file. \n
     Inputs are file name, longitude name, latitude name. \n
@@ -49,6 +98,83 @@ def read_coordinates(filename, nlon, nlat, dd=True, subsample=1):
         sys.exit(1)
     fid.close()
     return lon, lat
+
+
+def read_idf_gcps(filename, nlon, nlat):
+    # - Open Netcdf file
+    fid = netCDF4.Dataset(filename, 'r')
+
+    # - Read 1d or 2d coordinates
+    # Extract data from the handler
+    lon_gcp = numpy.array(handler['lon_gcp'][:])
+    lat_gcp = numpy.array(handler['lat_gcp'][:])
+    # Enforce longitude continuity (to be improved)
+    if len(numpy.shape(lon_gcp)) == 2:
+        regular = False
+        i_gcp = numpy.array(handler['index_row_gcp'][:])
+        j_gcp = numpy.array(handler['index_cell_gcp'][:])
+    else:
+        regular = True
+        i_gcp = numpy.array(handler['index_lat_gcp'][:])
+        j_gcp = numpy.array(handler['index_lon_gcp'][:])
+    if regular is True:
+        ind_lon = numpy.where((lon_gcp > box[0]-1) & (lon_gcp < box[1]+1))
+        ind_lat = numpy.where((lat_gcp > box[2]-1) & (lat_gcp < box[3]+1))
+        lon_gcp = lon_gcp[ind_lon]
+        lat_gcp = lat_gcp[ind_lat]
+        j_gcp = j_gcp[ind_lon]
+        i_gcp = i_gcp[ind_lat]
+        i0 = numpy.min(i_gcp)
+        i1 = numpy.max(i_gcp) + 1
+        j0 = numpy.min(j_gcp)
+        j1 = numpy.max(j_gcp) + 1
+        j_gcp = j_gcp - j_gcp[0]
+        i_gcp = i_gcp - i_gcp[0]
+    else:
+        ind_lon_lat = numpy.where((lon_gcp > box[0]) & (lon_gcp < box[1])
+                               & (lat_gcp > box[2]) & (lat_gcp < box[3]))
+        i_gcp_0 = numpy.min(ind_lon_lat[0])
+        i_gcp_1 = numpy.max(ind_lon_lat[0])
+        j_gcp_0 = numpy.min(ind_lon_lat[1])
+        j_gcp_1 = numpy.max(ind_lon_lat[1])
+        lon_gcp = lon_gcp[i_gcp_0:i_gcp_1 + 1, j_gcp_0: j_gcp_1 + 1]
+        lat_gcp = lat_gcp[i_gcp_0:i_gcp_1 + 1, j_gcp_0: j_gcp_1 + 1]
+        i0 = i_gcp[i_gcp_0]
+        i1 = i_gcp[i_gcp_1] + 1
+        i0 = j_gcp[j_gcp_0]
+        i1 = j_gcp[j_gcp_1] + 1
+    if (lon_gcp[-1] - lon_gcp[0]) > 180.0:
+        print('Difference between first and last longitude exceeds '
+                    '180 degrees, assuming IDL crossing and remapping '
+                    'longitudes in [0, 360]')
+        box[0] = numpy.mod(box[0] + 360, 360)
+        box[1] = numpy.mod(box[1] + 360, 360)
+        lon_gcp = numpy.mod((lon_gcp + 360.0), 360.0)
+    # Restore shape of the GCPs
+    #gcps_shape = (8, 8)  # hardcoded in SEAScope
+    #i_shaped = numpy.reshape(i_gcp, gcps_shape)
+    #j_shaped = numpy.reshape(j_gcp, gcps_shape)
+    #lon_shaped = numpy.reshape(lon_gcp, gcps_shape)
+    #lat_shaped = numpy.reshape(lat_gcp, gcps_shape)
+    if len(numpy.shape(i_gcp)) == 1:
+        j_shaped, i_shaped = numpy.meshgrid(j_gcp, i_gcp)
+    else:
+        i_shaped = i_gcp
+        j_shaped = j_gcp
+    if len(numpy.shape(lon_gcp)) == 1:
+        lon_shaped, lat_shaped = numpy.meshgrid(lon_gcp, lat_gcp[:])
+    else:
+        lon_shaped = lon_gcp[:, :]
+        lat_shaped = lat_gcp[:, :]
+    shape = numpy.shape(sst_reg)
+    dst_lin = numpy.arange(0, shape[0])
+    dst_pix = numpy.arange(0, shape[1])
+    _dst_lin = numpy.tile(dst_lin[:, numpy.newaxis], (1, shape[1]))
+    _dst_pix = numpy.tile(dst_pix[numpy.newaxis, :], (shape[0], 1))
+
+    lon2d, lat2d = geoloc_from_gcps(lon_shaped, lat_shaped, i_shaped,
+                                      j_shaped, _dst_lin, _dst_pix)
+
 
 
 def read_var(filename, var, index=None, time=0, depth=0, subsample=1,
@@ -418,7 +544,22 @@ def read_trajectory(infile, list_var):
 
 
 def interp_vel(VEL, save_s=False, save_ow=False, save_rv=False,) -> dict:
-    interp2d = scipy.interpolate.interp2d
+    if len(numpy.shape(VEL.Vlonu)) == 1:
+        regular = True
+        interp2d = scipy.interpolate.interp2d
+        _lonu = + VEL.Vlonu
+        _lonv = + VEL.Vlonv
+        _latu = + VEL.Vlatu
+        _latv = + VEL.Vlatv
+    else:
+        interp2d = scipy.interpolate.NearestNDInterpolator
+        _lonu = + VEL.Vlonu.ravel()
+        _lonv = + VEL.Vlonv.ravel()
+        _latu = + VEL.Vlatu.ravel()
+        _latv = + VEL.Vlatv.ravel()
+        points = (_lonu, _latu) #list(zip((_lonu, _latu)))
+        print(numpy.shape(_lonu), numpy.shape(_latu))
+        regular = False
     _inte_u = None
     _inte_v = None
     _inte_h = None
@@ -433,26 +574,73 @@ def interp_vel(VEL, save_s=False, save_ow=False, save_rv=False,) -> dict:
         _inte_ss = []
         _inte_rv = []
         for t in range(numpy.shape(VEL.u)[0]):
-            _inte_u.append(interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u[t, :, :]))
-            _inte_v.append(interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v[t, :, :]))
-            _inte_h.append(interp2d(VEL.Vlonu, VEL.Vlatv, VEL.h[t, :, :]))
+            if regular:
+                _u = + VEL.u[t, :, :]
+                _v = + VEL.v[t, :, :]
+                _h = + VEL.h[t, :, :]
+                _inte_u.append(interp2d(_lonu, _latu, _u))
+                _inte_v.append(interp2d(_lonv, _latv, _v))
+                _inte_h.append(interp2d(_lonu, _latv, _h))
+            else:
+                _u = + VEL.u[t, :, :].ravel()
+                _v = + VEL.v[t, :, :].ravel()
+                _h = + VEL.h[t, :, :].ravel()
+                _inte_u.append(interp2d(points, _u))
+                _inte_v.append(interp2d(points, _v))
+                _inte_h.append(interp2d(points, _h))
             if save_s is True or save_ow is True:
-                _inte_sn.append(interp2d(VEL.Vlonu, VEL.Vlatv,
-                                         VEL.Sn[t, :, :]))
-                _inte_ss.append(interp2d(VEL.Vlonu, VEL.Vlatv,
-                                         VEL.Ss[t, :, :]))
+                if regular:
+                    _Sn = + VEL.Sn[t, :, :]
+                    _Ss = + VEL.Ss[t, :, :]
+                    _inte_sn.append(interp2d(_lonu, _latv, _Sn))
+                    _inte_ss.append(interp2d(_lonu, _latv, _Ss))
+                else:
+                    _Sn = + VEL.Sn[t, :, :].ravel()
+                    _Ss = + VEL.Ss[t, :, :].ravel()
+
+                    _inte_sn.append(interp2d(points, _Sn))
+                    _inte_ss.append(interp2d(points, _Ss))
             if save_rv is True or save_ow is True:
-                _inte_rv.append(interp2d(VEL.Vlonu, VEL.Vlatv,
-                                         VEL.RV[t, :, :]))
+                if regular:
+                    _RV = + VEL.RV[t, :, :]
+                    _inte_rv.append(interp2d(_lonu, _latv, _RV))
+                else:
+                    _RV = + VEL.RV[t, :, :].ravel()
+                    _inte_rv.append(interp2d(points, _RV))
     else:
-        _inte_u = list([interp2d(VEL.Vlonu, VEL.Vlatu, VEL.u), ])
-        _inte_v = list([interp2d(VEL.Vlonv, VEL.Vlatv, VEL.v), ])
-        _inte_h = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.h), ])
+        if regular:
+            _u =  VEL.u[:, :]
+            _v =  VEL.v[:, :]
+            _h = VEL.h[:, :]
+            _inte_u = list([interp2d(_lonu, _latu, _u), ])
+            _inte_v = list([interp2d(_lonv, _latv, _v), ])
+            _inte_h = list([interp2d(_lonu, _latv, _h), ])
+        else:
+            _u =  VEL.u[:, :].ravel()
+            print(numpy.shape(_u))
+            _v =  VEL.v[:, :].ravel()
+            _h = VEL.h[:, :].ravel()
+            _inte_u = list([interp2d(points, _u), ])
+            _inte_v = list([interp2d(points, _v), ])
+            _inte_h = list([interp2d(points, _h), ])
         if save_s is True or save_ow is True:
-            _inte_sn = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.Sn), ])
-            _inte_ss = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.Ss), ])
+            if regular:
+                _Sn = VEL.Sn[:, :]
+                _Ss = VEL.Ss[:, :]
+                _inte_sn = list([interp2d(_lonu, _latv, _Sn), ])
+                _inte_ss = list([interp2d(_lonu, _latv, _Ss), ])
+            else:
+                _Sn = VEL.Sn[:, :].ravel()
+                _Ss = VEL.Ss[:, :].ravel()
+                _inte_sn = list([interp2d(points, _Sn), ])
+                _inte_ss = list([interp2d(points, _Ss), ])
         if save_rv is True or save_ow is True:
-            _inte_rv = list([interp2d(VEL.Vlonu, VEL.Vlatv, VEL.RV), ])
+            if regular:
+                _RV = + VEL.RV[:, :]
+                _inte_rv = list([interp2d(_lonu, _latv, _RV), ])
+            else:
+                _RV = + VEL.RV[:, :].ravel()
+                _inte_rv = list([interp2d(points, _RV), ])
 
     dic_interp = {'u': _inte_u, 'v': _inte_v, 'h': _inte_h,
                   'sn': _inte_sn, 'ss': _inte_ss, 'rv': _inte_rv}

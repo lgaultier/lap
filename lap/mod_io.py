@@ -244,26 +244,28 @@ def Read_grid_model(p):
     return Tr
 
 
-def make_mask(p):
+def make_mask(p, VEL):
     # mask_grid
-    filename = os.path.join(p.vel_input_dir, p.list_vel[0])
-    if not os.path.isfile(filename):
-        logger.error(f'File {filename} not found')
-        sys.exit(1)
-    if p.vel_format == 'regular_netcdf':
-        VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
-                                         varv=p.name_u, lon=p.name_lon,
-                                         lat=p.name_lat, box=p.box)
-
-    elif p.vel_format == 'nemo':
-        VEL = read_utils.nemo(filename=filename, varu=p.name_u,
-                              varv=p.name_v, lon=p.name_lon,
-                              lat=p.name_lat, box=p.box, subsample=p.subsample)
-
-    VEL.read_coord()
-    VEL.read_vel()
+    #filename = os.path.join(p.vel_input_dir, p.list_vel[0])
+    #if not os.path.isfile(filename):
+    #    logger.error(f'File {filename} not found')
+    #    sys.exit(1)
+    #if p.vel_format == 'regular_netcdf':
+    #    VEL = read_utils.velocity_netcdf(filename=filename, varu=p.name_u,
+    #                                     varv=p.name_u, lon=p.name_lon,
+    #                                     lat=p.name_lat, box=p.box)
+#
+#    elif p.vel_format == 'nemo':
+#        VEL = read_utils.nemo(filename=filename, varu=p.name_u,
+#                              varv=p.name_v, lon=p.name_lon,
+#                              lat=p.name_lat, box=p.box, subsample=p.subsample)
+#
+#    VEL.read_coord()
+#    VEL.read_vel()
     # VEL.lon = (VEL.lon + 360.) % 360.
-    lon2du, lat2du = numpy.meshgrid(VEL.lon, VEL.lat)
+    if len(numpy.shape(VEL.lon)) == 1:
+        lon2du, lat2du = numpy.meshgrid(VEL.lon, VEL.lat)
+
     masku = VEL.varu
     masku[abs(masku) > 50.] = numpy.nan
     masku[abs(VEL.varv) > 50.] = numpy.nan
@@ -273,7 +275,7 @@ def make_mask(p):
     return Teval
 
 
-def make_grid(p):
+def make_grid(p, VEL, mask=False):
     _coord = list(p.parameter_grid)
     if len(_coord) == 6:
         lon0, lon1, dlon, lat0, lat1, dlat = list(p.parameter_grid)
@@ -287,12 +289,14 @@ def make_grid(p):
     lattmp = numpy.linspace(lat0, lat1, int((lat1 - lat0) / dlat))
     Tr.lon, Tr.lat = numpy.meshgrid(lontmp, lattmp)
     # TODO PROVIDE A MASK FILE
-    Teval = make_mask(p)
-    masktmp = Teval(lattmp, lontmp)
     shape_tra = numpy.shape(Tr.lon)
-    masktmp = masktmp.reshape(shape_tra)
+    if mask == True:
+        Teval = make_mask(p, VEL)
+        masktmp = Teval(lattmp, lontmp)
+        masktmp = masktmp.reshape(shape_tra)
+    else:
+        masktmp = numpy.ones(shape_tra)
     # TODO create real mask
-    # masktmp = numpy.ones(shape_tra)
     Tr.mask = (masktmp > 0)
     return Tr
 

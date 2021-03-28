@@ -38,7 +38,7 @@ def make_default(p):
     p.tracer_filter = getattr(p, 'tracer_filter', (0, 0))
 
     # Velocity parameters
-    p.list_vel = list(getattr(p, 'list_vel'))
+    p.list_vel = list(getattr(p, 'list_vel', None))
     p.vel_format = getattr(p, 'vel_format', 'regular_netcdf')
     p.vel_step = getattr(p, 'vel_step', 1.)
     if p.vel_format == 'regular_netcdf':

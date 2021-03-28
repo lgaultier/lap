@@ -6,6 +6,7 @@ import lap.mod_advection as mod_advection
 import lap.utils.tools as tools
 import lap.mod_io as mod_io
 import lap.utils.general_utils as utils
+import lap.utils.read_utils as uread
 import logging
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
             _adv = mod_advection.advection_pa_timestep_np
             advect = _adv(p, lonpa, latpa, dt, mask, r,
                           dic_vel['u'], dic_vel['v'])
-            lonpa, latpa, mask = advect
+            lonpa, latpa, mask, _, _ = advect
             dt += p.adv_time_step
             if store is True:
                 npa_lon[i].append(lonpa)
@@ -166,7 +167,7 @@ def lyapunov(p, VEL):
     if rank == 0:
         logger.info(f'Start time {datetime.datetime.now()}')
         logger.info(f'Loading grid for advection for processor {rank}')
-        grid = mod_io.make_grid(p)
+        grid = mod_io.make_grid(p, VEL)
         # Make a list of particles out of the previous grid
         utils.make_list_particles(grid)
     else:
@@ -177,7 +178,7 @@ def lyapunov(p, VEL):
     # Read velocity
     dic_vel = None
     if rank == 0:
-        dic_vel = utils.interp_vel(VEL)
+        dic_vel = uread.interp_vel(VEL)
     if p.parallelisation is True:
         VEL = comm.bcast(VEL, root=0)
         dic_vel = comm.bcast(dic_vel, root=0)
@@ -197,8 +198,7 @@ def lyapunov(p, VEL):
         latpa = grid.lat1d[pa]
         # advect four points around position
         _npalon, _npalat = init_particles(lonpa, latpa, p.delta0)
-        npalon, npalat, mask = advection(p, _npalon, _npalat, dic_vel['u'],
-                                         dic_vel['v'],
+        npalon, npalat, mask = advection(p, _npalon, _npalat, dic_vel,
                                          store=store)
         if pa % 100 == 0:
             perc = float(pa - i0) / float(len(reducepart))
