@@ -102,10 +102,14 @@ def advection_pa_timestep_np(p, lonpa: float, latpa: float, dt: float,
     # TODO boundary condition
     # Temporal interpolation  for velocity
     if type(_interp_u) is list and len(_interp_u) > 1:
-        _interp_ut = (_interp_u[interp_dt](lonpa, latpa) * (1 - dt)
-                      + _interp_u[interp_dt+1](lonpa, latpa) * dt)
-        _interp_vt = (_interp_v[interp_dt](lonpa, latpa) * (1 - dt)
-                      + _interp_v[interp_dt+1](lonpa, latpa) * dt)
+        if p.stationary is True:
+            _interp_ut = _interp_u[interp_dt](lonpa, latpa)
+            _interp_vt = _interp_v[interp_dt](lonpa, latpa)
+        else:
+            _interp_ut = (_interp_u[interp_dt](lonpa, latpa) * (1 - dt)
+                          + _interp_u[interp_dt+1](lonpa, latpa) * dt)
+            _interp_vt = (_interp_v[interp_dt](lonpa, latpa) * (1 - dt)
+                          + _interp_v[interp_dt+1](lonpa, latpa) * dt)
     else:
         _interp_ut = _interp_u[0](lonpa, latpa)
         _interp_vt = _interp_v[0](lonpa, latpa)

@@ -63,6 +63,7 @@ def make_grid(p, VEL, coord):
 def sort_files(p):
     list_file = sorted(glob.glob(os.path.join(p.vel_input_dir,
                                               f'*{p.pattern}*')))
+    print(list_file, p.vel_input_dir, p.pattern)
     list_date = []
     list_name = []
     for ifile in list_file:
@@ -71,9 +72,9 @@ def sort_files(p):
             continue
         _date = datetime.datetime(int(match.group(1)), int(match.group(2)),
                                   int(match.group(3)))
-        if _date >= p.first_date and _date <= p.last_date:
-            list_date.append(_date)
-            list_name.append(ifile)
+        #if _date >= p.first_date and _date <= p.last_date:
+        list_date.append(_date)
+        list_name.append(ifile)
     if not list_name:
         logger.error(f'{p.pattern} files not found in {p.vel_input_dir}')
         sys.exit(1)
@@ -89,13 +90,15 @@ def sort_files(p):
 
     #print(list_name[264], list_name[480])
     frequency = list(set(diff))
+    if frequency:
+        frequency = frequency[0]
     if p.stationary is True:
         list_name = [list_name[0]]
         list_date = [list_date[0]]
     #if len(frequency) != 1:
     #    raise RuntimeError(f"Time series does not have a constant step between"
     #                        " two grids: {frequency} seconds")
-    return list_name, list_date, frequency[0]
+    return list_name, list_date, frequency
 
 
 def check_crossing(lon1: float, lon2: float, validate: bool = True):
@@ -143,6 +146,8 @@ def read_velocity(p, get_tie=None):
                 VEL = ds.sel(lat=slice(p.box[2], p.box[3]))
             else:
                 VEL = ds.sel(latitude=slice(p.box[2], p.box[3]))
+            if 'depth' in VEL.dims:
+                VEL = VEL.isel(depth=0)
     else:
         if p.depth is not None:
             if name_lat == 'lat':
@@ -151,6 +156,8 @@ def read_velocity(p, get_tie=None):
             else:
                 VEL = ds.sel(depth=p.depth, latitude=slice(p.box[2], p.box[3]),
                              longitude=slice(_box0, _box1))
+            if p.depth == 0:
+                VEL = VEL.isel(depth=0)
         else:
             if name_lat == 'lat':
                 VEL = ds.sel(lat=slice(p.box[2], p.box[3]),
@@ -158,6 +165,8 @@ def read_velocity(p, get_tie=None):
             else:
                 VEL = ds.sel(latitude=slice(p.box[2], p.box[3]),
                              longitude=slice(_box0, _box1))
+            if 'depth' in VEL.dims:
+                VEL = VEL.isel(depth=0)
     # Intialize empty matrices
     ds.close()
     del ds

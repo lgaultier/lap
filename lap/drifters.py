@@ -8,7 +8,7 @@
 # - Feb 2015: Version 1.0
 # - Dec 2015: Version 2.0
 # - Dec 2017: Version 3.0
-#
+# - Jan 2021: Version 4.0
 # Notes:
 # - Written for Python 3.4, tested with Python 3.6
 #

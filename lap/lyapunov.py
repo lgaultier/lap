@@ -20,10 +20,11 @@ import datetime
 from typing import Optional, Tuple
 import numpy
 import sys
-import lap.mod_advection as mod_advection
 import lap.utils.tools as tools
 import lap.mod_io as mod_io
+import lap.mod_advection as mod_advection
 import lap.utils.general_utils as utils
+import lap.utils.read_utils as uread
 import logging
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
     mask = 0
     r = numpy.zeros((2, 1))
     tadvection = (p.first_date - p.last_date).total_seconds() / 86400
+    tstop = int(abs(tadvection) / p.output_step) + p.adv_time_step
+
     for i in range(num_pa[0]):
         lonpa = + npa_lon[i]
         latpa = + npa_lat[i]
@@ -53,26 +56,31 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
             npa_lon[i] = []
             npa_lat[i] = []
         dt = 0
-        while dt < abs(tadvection):
-			# Index in velocity array, set to 0 if stationary
-			curdate = p.first_date + datetime.timedelta(seconds=dt*86400)
-			_diff = (numpy.datetime64(curdate) - dic_vel['time'])
-			ind_t = numpy.argmin(abs(_diff), out=None)
-			if dic_vel['time'][ind_t] > numpy.datetime64(curdate) :
-				ind_t = max(0, ind_t - 1)
-			if ind_t > len(dic_vel['time']) - 1:
-				break
-			dt_vel = ((numpy.datetime64(curdate) - dic_vel['time'][ind_t])
-				      / (dic_vel['time'][ind_t + 1] - dic_vel['time'][ind_t]))
-			if p.stationary:
-				ind_t = 0
-				dt_vel = 0
+        for t in numpy.arange(p.adv_time_step, tstop, p.adv_time_step):
+            # Index in velocity array, set to 0 if stationary
+            if p.stationary:
+                curdate = p.first_date
+                _diff = (numpy.datetime64(curdate) - dic_vel['time'])
+                ind_t = numpy.argmin(abs(_diff), out=None)
+                dt_vel = 0
+            else:
+                curdate = p.first_date + datetime.timedelta(seconds=t*86400)
+                _diff = (numpy.datetime64(curdate) - dic_vel['time'])
+                ind_t = numpy.argmin(abs(_diff), out=None)
+                dt_vel = ((numpy.datetime64(curdate) - dic_vel['time'][ind_t])
+                          /(dic_vel['time'][ind_t+1] - dic_vel['time'][ind_t]))
+            if dic_vel['time'][ind_t] > numpy.datetime64(curdate) :
+                ind_t = max(0, ind_t - 1)
+            if ind_t > len(dic_vel['time']) - 1:
+                ind_t = max(0, ind_t - 1)
+                break
 
             # # TODO: retrieve index t in velocity
+
             _adv = mod_advection.advection_pa_timestep_np
             advect = _adv(p, lonpa, latpa, dt_vel, ind_t, mask, r,
                           dic_vel['u'], dic_vel['v'])
-            lonpa, latpa, mask = advect
+            lonpa, latpa, mask, dlondt, dlatdt = advect
             dt += p.adv_time_step
             if store is True:
                 npa_lon[i].append(lonpa)
@@ -169,11 +177,13 @@ def fsle_pa(lon: numpy.ndarray, lat: numpy.ndarray, df: float, d0: float,
 def run_lyapunov(p):
     tools.make_default(p)
     logger.info('Loading Velocity')
+    #VEL, coord = mod_io.read_velocity(p)
+    from . import read_utils_xr as rr
     VEL, coord = rr.read_velocity(p)
     lyapunov(p, VEL, coord)
 
 
-def lyapunov(p, VEL, coord):
+def lyapunov(p, VEL: dict, coord: dict) -> dict:
     # - Initialize variables from parameter file
     # ------------------------------------------
     tools.make_default(p)
@@ -199,7 +209,7 @@ def lyapunov(p, VEL, coord):
     if rank == 0:
         logger.info(f'Start time {datetime.datetime.now()}')
         logger.info(f'Loading grid for advection for processor {rank}')
-        grid = mod_io.make_grid(p)
+        grid = mod_io.make_grid(p, VEL, coord)
         # Make a list of particles out of the previous grid
         utils.make_list_particles(grid)
     else:
@@ -210,7 +220,8 @@ def lyapunov(p, VEL, coord):
     # Read velocity
     dic_vel = None
     if rank == 0:
-        dic_vel = utils.interp_vel(VEL, coord)
+        logger.info('Loading Velocity')
+        dic_vel = uread.interp_vel(VEL, coord)
     if p.parallelisation is True:
         dic_vel = comm.bcast(dic_vel, root=0)
 
@@ -229,8 +240,8 @@ def lyapunov(p, VEL, coord):
         latpa = grid.lat1d[pa]
         # advect four points around position
         _npalon, _npalat = init_particles(lonpa, latpa, p.delta0)
-        npalon, npalat, mask = advection(p, _npalon, _npalat, dic_vel['u'],
-                                         dic_vel['v'],
+
+        npalon, npalat, mask = advection(p, _npalon, _npalat, dic_vel,
                                          store=store)
         if pa % 100 == 0:
             perc = float(pa - i0) / float(len(reducepart))
@@ -260,7 +271,7 @@ def lyapunov(p, VEL, coord):
         data['lon2'] = grid.lon1d.reshape(shape_grid)
         data['lat2'] = grid.lat1d.reshape(shape_grid)
         data['lat'] = grid.lat
-        _date = (p.first_day - p.reference).total_seconds() / 86400
+        _date = (p.first_date - p.reference).total_seconds() / 86400
         data['time'] = numpy.array([_date, ])
         if isFSLE is True:
             description = ("Finite-Size Lyapunov Exponent computed using"
