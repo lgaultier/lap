@@ -8,7 +8,7 @@
 # - Feb 2015: Version 1.0
 # - Dec 2015: Version 2.0
 # - Dec 2017: Version 3.0
-#
+# - Jan 2021: Version 4.0
 # Notes:
 # - Written for Python 3.4, tested with Python 3.6
 #
@@ -30,11 +30,13 @@ logger = logging.getLogger(__name__)
 def run_drifter(p) -> None:
     tools.make_default(p)
     logger.info('Loading Velocity')
-    VEL = mod_io.read_velocity(p)
-    _ = drifter(p, VEL, save_netcdf=True)
+    #VEL, coord = mod_io.read_velocity(p)
+    from . import read_utils_xr as rr
+    VEL, coord = rr.read_velocity(p)
+    _ = drifter(p, VEL, coord, save_netcdf=True)
 
 
-def drifter(p, VEL, save_netcdf=False) -> dict:
+def drifter(p, VEL: dict, coord: dict, save_netcdf=False) -> dict:
     # - Initialize variables from parameter file
     # ------------------------------------------
     tools.make_default(p)
@@ -48,9 +50,9 @@ def drifter(p, VEL, save_netcdf=False) -> dict:
         logger.info(f'Loading grid for advection for processor {rank}')
         # - Read or make advection grid
         if p.make_grid is False:
-            grid = mod_io.read_grid_tiff(p)
+            grid = mod_io.read_points(p)
         else:
-            grid = mod_io.make_grid(p)
+            grid = mod_io.make_grid(p, VEL, coord)
         # Make a list of particles out of the previous grid
         utils.make_list_particles(grid)
 
@@ -77,8 +79,7 @@ def drifter(p, VEL, save_netcdf=False) -> dict:
     dic_vel = None
     if rank == 0:
         logger.info('Loading Velocity')
-        dic_vel = uread.interp_vel(VEL, save_s=p.save_S, save_ow=p.save_OW,
-                                   save_rv=p.save_RV)
+        dic_vel = uread.interp_vel(VEL, coord)
     if p.parallelisation is True:
         dic_vel = comm.bcast(dic_vel, root=0)
 

@@ -39,10 +39,11 @@ def init_empty_variables(p, grid, listTr, size, rank):
     # Sublist of particles when parallelised
     reducepart = numpy.arange(i0, i1)
     # Number of Timesteps to store
-    Timesize_lr = int(abs(p.tadvection + 1) / p.output_step + 1)
+    tadvection = (p.last_date - p.first_date).total_seconds() / 86400
+    Timesize_lr = int(abs(tadvection + 1) / p.output_step + 1)
     # initialization + advection for t in [0, tadvection] with adv_time_step
     # time step
-    Timesize_hr = int(abs(p.tadvection + 1) / p.output_step / p.adv_time_step
+    Timesize_hr = int(abs(tadvection + 1) / p.output_step / abs(p.adv_time_step)
                       + 1)
     dim_hr = [Timesize_hr, Gridsize]
     dim_lr = [Timesize_lr, Gridsize]
@@ -109,9 +110,10 @@ def gather_data_mpi(p, list_var_adv, listGr, listTr, dim_lr, dim_hr,
         if 'time_hr' in list_var_adv.keys():
             data['time_hr'] = list_var_adv['time_hr']
             del list_var_adv['time_hr']
-        tstep = p.tadvection / p.output_step / abs(p.tadvection)
-        first_day = (p.first_day - p.reference).total_seconds() / 86400
-        tstop = first_day + p.tadvection + tstep
+        tadvection = (p.last_date - p.first_date).total_seconds() / 86400
+        tstep = tadvection / p.output_step / abs(tadvection)
+        first_day = (p.first_date - p.reference).total_seconds() / 86400
+        tstop = first_day + tadvection + tstep
         data['time'] = numpy.arange(first_day, tstop, tstep)
         for irank in range(0, size):
 
@@ -153,9 +155,10 @@ def gather_data(p, list_var_adv, listGr, listTr) -> dict:
     data = {}
     for key, value in list_var_adv.items():
         data[key] = list_var_adv[key]
-    tstep = p.tadvection / p.output_step / abs(p.tadvection)
-    first_day = (p.first_day - p.reference).total_seconds() / 86400
-    tstop = first_day + p.tadvection + tstep
+    tadvection = (p.last_date - p.first_date).total_seconds() / 86400
+    tstep = tadvection / p.output_step / abs(tadvection)
+    first_day = (p.first_date - p.reference).total_seconds() / 86400
+    tstop = first_day + tadvection + tstep
     data['time'] = numpy.arange(first_day, tstop, tstep)
     return data
 

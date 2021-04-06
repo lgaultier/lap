@@ -1,10 +1,28 @@
+'''
+#-----------------------------------------------------------------------
+#                       Additional Documentation
+# Author: Lucile Gaultier
+#
+# Modification History:
+# - Jan 2015:  Original by Lucile Gaultier
+# - Feb 2015: Version 1.0
+# - Dec 2015: Version 2.0
+# - Dec 2017: Version 3.0
+# - Jan 2021: Version 4.0
+# Notes:
+# - Written for Python 3.4, tested with Python 3.6
+#
+# Copyright (c)
+#-----------------------------------------------------------------------
+'''
+
 import datetime
 from typing import Optional, Tuple
 import numpy
 import sys
-import lap.mod_advection as mod_advection
 import lap.utils.tools as tools
 import lap.mod_io as mod_io
+import lap.mod_advection as mod_advection
 import lap.utils.general_utils as utils
 import lap.utils.read_utils as uread
 import logging
@@ -28,6 +46,9 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
     num_pa = numpy.shape(npa_lon)
     mask = 0
     r = numpy.zeros((2, 1))
+    tadvection = (p.last_date - p.first_date).total_seconds() / 86400
+    tstop = int((tadvection) / p.output_step) + p.adv_time_step
+
     for i in range(num_pa[0]):
         lonpa = + npa_lon[i]
         latpa = + npa_lat[i]
@@ -35,10 +56,29 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
             npa_lon[i] = []
             npa_lat[i] = []
         dt = 0
-        while dt < abs(p.tadvection):
+        for t in numpy.arange(p.adv_time_step, tstop, p.adv_time_step):
+            # Index in velocity array, set to 0 if stationary
+            if p.stationary:
+                curdate = p.first_date
+                _diff = (numpy.datetime64(curdate) - dic_vel['time'])
+                ind_t = numpy.argmin(abs(_diff), out=None)
+                dt_vel = 0
+            else:
+                curdate = p.first_date + datetime.timedelta(seconds=t*86400)
+                _diff = (numpy.datetime64(curdate) - dic_vel['time'])
+                ind_t = numpy.argmin(abs(_diff), out=None)
+                dt_vel = ((numpy.datetime64(curdate) - dic_vel['time'][ind_t])
+                          /(dic_vel['time'][ind_t+1] - dic_vel['time'][ind_t]))
+            if dic_vel['time'][ind_t] > numpy.datetime64(curdate) :
+                ind_t = max(0, ind_t - 1)
+            if ind_t > len(dic_vel['time']) - 1:
+                ind_t = max(0, ind_t - 1)
+                break
+
             # # TODO: retrieve index t in velocity
+
             _adv = mod_advection.advection_pa_timestep_np
-            advect = _adv(p, lonpa, latpa, dt, mask, r,
+            advect = _adv(p, lonpa, latpa, dt_vel, ind_t, mask, r,
                           dic_vel['u'], dic_vel['v'])
             lonpa, latpa, mask, _, _ = advect
             dt += p.adv_time_step
@@ -115,7 +155,7 @@ def fsle_pa(lon: numpy.ndarray, lat: numpy.ndarray, df: float, d0: float,
     istep = 0
     while istep < len(_max):
         if _max[istep] > df:
-            tau = istep * dt
+            tau = istep * abs(dt)
             break
         istep += 1
     if tau != 0:
@@ -128,7 +168,7 @@ def fsle_pa(lon: numpy.ndarray, lat: numpy.ndarray, df: float, d0: float,
         deform[1, 1] = lat[3][istep] - lat[2][istep]
         lmax, _, _ = deform_pa(lonpa, latpa, d0)
     else:
-        tau = tf
+        tau = abs(tf)
         lmax = df / d0
     fsle = numpy.log(lmax) / tau
     return fsle, 0, 0
@@ -137,11 +177,13 @@ def fsle_pa(lon: numpy.ndarray, lat: numpy.ndarray, df: float, d0: float,
 def run_lyapunov(p):
     tools.make_default(p)
     logger.info('Loading Velocity')
-    VEL = mod_io.read_velocity(p)
-    lyapunov(p, VEL)
+    #VEL, coord = mod_io.read_velocity(p)
+    from . import read_utils_xr as rr
+    VEL, coord = rr.read_velocity(p)
+    lyapunov(p, VEL, coord)
 
 
-def lyapunov(p, VEL):
+def lyapunov(p, VEL: dict, coord: dict) -> dict:
     # - Initialize variables from parameter file
     # ------------------------------------------
     tools.make_default(p)
@@ -167,7 +209,7 @@ def lyapunov(p, VEL):
     if rank == 0:
         logger.info(f'Start time {datetime.datetime.now()}')
         logger.info(f'Loading grid for advection for processor {rank}')
-        grid = mod_io.make_grid(p, VEL)
+        grid = mod_io.make_grid(p, VEL, coord)
         # Make a list of particles out of the previous grid
         utils.make_list_particles(grid)
     else:
@@ -178,9 +220,9 @@ def lyapunov(p, VEL):
     # Read velocity
     dic_vel = None
     if rank == 0:
-        dic_vel = uread.interp_vel(VEL)
+        logger.info('Loading Velocity')
+        dic_vel = uread.interp_vel(VEL, coord)
     if p.parallelisation is True:
-        VEL = comm.bcast(VEL, root=0)
         dic_vel = comm.bcast(dic_vel, root=0)
 
     # For each point in Grid
@@ -193,11 +235,14 @@ def lyapunov(p, VEL):
     all_mask = []
     data_r = {}
 
+    tadvection = (p.last_date - p.first_date).total_seconds() / 86400
+
     for pa in reducepart:
         lonpa = grid.lon1d[pa]
         latpa = grid.lat1d[pa]
         # advect four points around position
         _npalon, _npalat = init_particles(lonpa, latpa, p.delta0)
+
         npalon, npalat, mask = advection(p, _npalon, _npalat, dic_vel,
                                          store=store)
         if pa % 100 == 0:
@@ -206,7 +251,7 @@ def lyapunov(p, VEL):
 
         # Compute FTLE
         vlambda, _, _ = method(npalon, npalat, p.deltaf, p.delta0,
-                               p.adv_time_step, abs(p.tadvection))
+                               p.adv_time_step, abs(tadvection))
         all_lambda.append(vlambda)
         all_mask.append(mask)
     data_r[name_var] = all_lambda
@@ -228,7 +273,7 @@ def lyapunov(p, VEL):
         data['lon2'] = grid.lon1d.reshape(shape_grid)
         data['lat2'] = grid.lat1d.reshape(shape_grid)
         data['lat'] = grid.lat
-        _date = (p.first_day - p.reference).total_seconds() / 86400
+        _date = (p.first_date - p.reference).total_seconds() / 86400
         data['time'] = numpy.array([_date, ])
         if isFSLE is True:
             description = ("Finite-Size Lyapunov Exponent computed using"

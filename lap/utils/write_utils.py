@@ -112,15 +112,23 @@ def write_velocity(data, outfile, description='AVISO-like data',
         vilon.long_name = f'{_text} {long_name["lon"]} dimension'
         vilat.long_name = f'{_text} {long_name["lat"]} dimension'
     for key, value in kwargs.items():
+        if key == 'time':
+            value *= 86400
         if value.any():
             dim_value = len(value.shape)
             if isidf:
                 bin_key = f'{key}_bin'
-                bvalue, scale, offset = pack_as_ubytes(value, fill_value)
+                _value = + value
+                bvalue, scale, offset = pack_as_ubytes(_value, fill_value)
             if dim_value == 1:
-                var = fid.createVariable(str(key), 'f4', (ndim_time, ),
-                                         fill_value=fill_value)
-                var[:] = value
+                if key == 'time':
+                    var = fid.createVariable(str(key), 'f8', (ndim_time, ),
+                                             fill_value=fill_value)
+                else:
+                    var = fid.createVariable(str(key), 'f4', (ndim_time, ),
+                                             fill_value=fill_value)
+                var[:] = + value
+                print(key, var[:], value)
                 if isidf:
                     bvar = fid.createVariable(bin_key, 'u1', (ndim_time, ),
                                               fill_value=numpy.ubyte(255))
@@ -211,6 +219,9 @@ def write_listracer_1d(wfile, T, p, listTr):
     exportables = [k for k in dir(p) if not k.startswith('__')]
     str_params = [f'{k}={getattr(p, k)}' for k in exportables]
     fid.comment = ' '.join(str_params)
+    strtime = '%Y-%m-%dT%H:%M:%SZ'
+    fid.time_coverage_start = p.first_date.strftime(strtime)
+    fid.time_coverage_end = p.last_date.strftime(strtime)
 
     # - Create dimensions
     dim_part = 'obs'
@@ -235,7 +246,7 @@ def write_listracer_1d(wfile, T, p, listTr):
         vtime = fid.createVariable('time_hr', 'f4', (dim_time_hr))
 
         vtime[:] = T['time_hr']
-        vtime.units = "days"
+        vtime.units = "days since start of advection"
         vtime.long_name = ('High temporal resolution time from the reference'
                            'time')
         if p.save_U is True:
@@ -272,15 +283,17 @@ def write_listracer_1d(wfile, T, p, listTr):
 
     vlon = fid.createVariable('lon', 'f4', (dim_time, dim_part),
                               fill_value=fill_value)
+    vlon.units = "deg E"
+    vlon.long_name = 'longitude'
     vlat = fid.createVariable('lat', 'f4', (dim_time, dim_part),
                               fill_value=fill_value)
+    vlat.units = "deg N"
+    vlat.long_name = 'latitude'
     vtime = fid.createVariable('time', 'f4', (dim_time), fill_value=fill_value)
     vlon[:, :] = T['lon_lr']
-    vlon.units = "deg E"
     vlat[:, :] = T['lat_lr']
-    vlat.units = "deg N"
-    vtime[:] = T['time']
-    vlon.units = "days"
+    vtime[:] = T['time_lr'][:]
+    vtime.units = "days since start of advection"
     vmask = fid.createVariable('mask_lr', 'f4', (dim_time, dim_part))
     vmask[:, :] = T['mask_lr']
     if p.list_tracer is not None:
