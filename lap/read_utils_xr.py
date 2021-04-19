@@ -63,7 +63,6 @@ def make_grid(p, VEL, coord):
 def sort_files(p):
     list_file = sorted(glob.glob(os.path.join(p.vel_input_dir,
                                               f'*{p.pattern}*')))
-    print(list_file, p.vel_input_dir, p.pattern)
     list_date = []
     list_name = []
     for ifile in list_file:
@@ -85,10 +84,7 @@ def sort_files(p):
     #list_name = list_name[_ind]
     diff = [(list_date[x + 1] - list_date[x]).total_seconds() for x in range(s)]
     _ind = numpy.where(numpy.array(diff)>86400)
-    #print(_ind)
-    #print(diff[264], diff[480])
 
-    #print(list_name[264], list_name[480])
     frequency = list(set(diff))
     if frequency:
         frequency = frequency[0]
@@ -133,7 +129,6 @@ def read_velocity(p, get_tie=None):
         if box[0] > box[1]:
             IDL = True
 
-    #print(_box0, _box1, ds.longitude.values)
     if IDL is True:
         ds = ds.sortby(numpy.mod(lon_ctor + 360, 360))
         if p.depth is not None:
@@ -190,7 +185,6 @@ def read_velocity(p, get_tie=None):
     # coord['lon2dv'] = lat2dv
     coord['time'] = [numpy.datetime64(x) for x in VEL.time.values]
     coord['time'] = numpy.array(coord['time'])
-    #print(VEL.time.values)
     # Mask data
     #VEL.fillna(0)
     uo_ctor = getattr(VEL, p.name_u)
