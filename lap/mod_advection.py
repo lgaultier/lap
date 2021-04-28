@@ -230,24 +230,26 @@ def advection(part: numpy.ndarray, dic: dict, p, i0: int, i1: int,
             mask = False
             tmod_lr = 1
             tout = 1
+            if p.stationary:
+                _diff = (numpy.datetime64(p.first_date) - dic['time'])
+                ind_t = numpy.argmin(abs(_diff), out=None)
+                dt = 0
             for t in numpy.arange(p.adv_time_step, tstop, p.adv_time_step):
                 # dt = t % p.vel_step
                 # Index for random walk
                 k = int(t)
                 # Index in velocity array, set to 0 if stationary
-                curdate = p.first_date + datetime.timedelta(seconds=t*86400)
-                _diff = (numpy.datetime64(curdate) - dic['time'])
-                ind_t = numpy.argmin(abs(_diff), out=None)
-                if dic['time'][ind_t] > numpy.datetime64(curdate) :
-                    ind_t = max(0, ind_t - 1)
-                if ind_t > len(dic['time']) - 2:
-                    ind_t = max(0, ind_t - 1)
-                    #break
-                dt = ((numpy.datetime64(curdate) - dic['time'][ind_t])
-                       / (dic['time'][ind_t + 1] - dic['time'][ind_t]))
-                if p.stationary:
-                    ind_t = 0
-                    dt = 0
+                if not p.stationary:
+                    curdate = p.first_date + datetime.timedelta(seconds=t*86400)
+                    _diff = (numpy.datetime64(curdate) - dic['time'])
+                    ind_t = numpy.argmin(abs(_diff), out=None)
+                    if dic['time'][ind_t] > numpy.datetime64(curdate) :
+                        ind_t = max(0, ind_t - 1)
+                    if ind_t > len(dic['time']) - 2:
+                        ind_t = max(0, ind_t - 1)
+                        #break
+                    dt = ((numpy.datetime64(curdate) - dic['time'][ind_t])
+                           / (dic['time'][ind_t + 1] - dic['time'][ind_t]))
                 # while dt < p.output_step:
                 rk = r[:, k]
                 advect = advection_pa_timestep_np(p, lonpa, latpa, dt, ind_t, mask,

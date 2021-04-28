@@ -71,9 +71,14 @@ def sort_files(p):
             continue
         _date = datetime.datetime(int(match.group(1)), int(match.group(2)),
                                   int(match.group(3)))
-        #if _date >= p.first_date and _date <= p.last_date:
-        list_date.append(_date)
-        list_name.append(ifile)
+        fdate = p.first_date
+        ldate = p.last_date
+        if p.first_date > p.last_date:
+            fdate = p.last_date
+            ldate = p.first_date
+        if _date >= fdate and _date <= ldate:
+            list_date.append(_date)
+            list_name.append(ifile)
     if not list_name:
         logger.error(f'{p.pattern} files not found in {p.vel_input_dir}')
         sys.exit(1)

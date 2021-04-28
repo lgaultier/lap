@@ -18,14 +18,12 @@ parameter_grid = (17., 35., 0.04, -43, -33, 0.04)
 box = [10., 50., -50., -20.]
 # First time of advection (in CNES julian days)
 reference = datetime.datetime(1970, 1,1)
-first_day = datetime.datetime(2019,2 , 14) # 20819
-strday = first_day.strftime('%Y%m%d')
+first_date = datetime.datetime(2021,2 , 12) # 20819
+last_date = datetime.datetime(2021,1 , 14) # 20819
 
 ## -- ADVECTION PARAMETER -- ## 
 # Time step for advection (in days)
-adv_time_step = 0.11
-# Time length of advection
-tadvection = -20
+adv_time_step = -0.11
 # parameters for random walk to simulate diffusion
 scale = 1.
 # Diffusion parameter (sigma = 0.00000035)
@@ -47,8 +45,10 @@ name_lat = 'latitude'
 name_u = 'ugos'
 name_v = 'vgos'
 # List of velocity files to use
-list_date = [first_day + datetime.timedelta(x) for x in range(0, tadvection -2, -1)]
-list_vel = [f'dt_global_allsat_phy_l4_{x.strftime("%Y%m%d")}_20190909.nc' for x in list_date]
+pattern = 'nrt_global_allsat_phy_l4_'
+import re
+MATCH = re.compile(r"nrt_global_allsat_phy_l4_(\d{4})(\d{2})(\d{2})_(\d{8}).nc").search
+depth = None
 # Time step between two velocity files
 vel_step = 1.
 
@@ -66,8 +66,8 @@ deltaf = 1.0
 fill_value = -1e36
 # Set output file name and path
 output_dir = './'
-test = diagnostic
-start = first_day.strftime('%Y%m%d')
+test = f'{diagnostic}_{pattern}'
+start = first_date.strftime('%Y%m%d')
 output_file = f'{test}_{start}_stat{stationary}.nc'
 output = os.path.join(output_dir, output_file)
 
