@@ -67,7 +67,9 @@ def sort_files(p):
     list_name = []
     frequency = []
     for ifile in list_file:
-        match = p.MATCH(ifile)
+        match = None
+        if p.MATCH is not None:
+            match = p.MATCH(ifile)
         if match is None:
             logger.info('Listing all files in the directory as match is None')
             list_name.append(ifile)
