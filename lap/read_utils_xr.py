@@ -65,35 +65,39 @@ def sort_files(p):
                                               f'*{p.pattern}*')))
     list_date = []
     list_name = []
+    frequency = []
     for ifile in list_file:
         match = p.MATCH(ifile)
         if match is None:
-            continue
-        _date = datetime.datetime(int(match.group(1)), int(match.group(2)),
-                                  int(match.group(3)))
-        fdate = p.first_date
-        ldate = p.last_date
-        if p.first_date > p.last_date:
-            fdate = p.last_date
-            ldate = p.first_date
-        if _date >= fdate and _date <= ldate:
-            list_date.append(_date)
+            logger.info('Listing all files in the directory as match is None')
             list_name.append(ifile)
+        else:
+            _date = datetime.datetime(int(match.group(1)), int(match.group(2)),
+                                      int(match.group(3)))
+            fdate = p.first_date
+            ldate = p.last_date
+            if p.first_date > p.last_date:
+                fdate = p.last_date
+                ldate = p.first_date
+            if _date >= fdate and _date <= ldate:
+                list_date.append(_date)
+                list_name.append(ifile)
     if not list_name:
         logger.error(f'{p.pattern} files not found in {p.vel_input_dir}')
         sys.exit(1)
     # The frequency between the grids must be constant.
-    s = len(list_date) -1
-    _ind = numpy.argsort(list_date)
-    #list_date = list_date[_ind]
-    #list_name = list_name[_ind]
-    diff = [(list_date[x + 1] - list_date[x]).total_seconds() for x in range(s)]
-    _ind = numpy.where(numpy.array(diff)>86400)
+    if list_date:
+        s = len(list_date) -1
+        _ind = numpy.argsort(list_date)
+        #list_date = list_date[_ind]
+        #list_name = list_name[_ind]
+        diff = [(list_date[x + 1] - list_date[x]).total_seconds() for x in range(s)]
+        _ind = numpy.where(numpy.array(diff)>86400)
 
-    frequency = list(set(diff))
+        frequency = list(set(diff))
     if frequency:
         frequency = frequency[0]
-    if p.stationary is True:
+    if (p.stationary) is True and list_date:
         list_name = [list_name[0]]
         list_date = [list_date[0]]
     #if len(frequency) != 1:
@@ -177,6 +181,10 @@ def read_velocity(p, get_tie=None):
     coord['latu'] = lat_ctor[:].values
     coord['lonv'] = numpy.mod(lon_ctor[:].values + 360., 360.)
     coord['latv'] = lat_ctor[:].values
+    if (not coord['lonu'].any()) or (not coord['latu'].any()):
+        logger.error('Check box or parameter_grid keys in your parameter file'
+                     ' as no data are found in your area')
+        sys.exit(1) 
     # TODO check this format?
     if len(lon_ctor.shape) == 2:
         lon2du, lat2du = (coord['lonu'], coord['latu'])

@@ -266,7 +266,6 @@ def make_mask(p, VEL):
     masku[VEL['u']['array'][0, :, :] == 0.] = numpy.nan
     vlat = VEL['u']['lat']
     vlon = VEL['u']['lon']
-    print(numpy.shape(vlat), numpy.shape(vlon), numpy.shape(VEL['u']['array'][0, :, :]))
     Teval = interpolate.RectBivariateSpline(vlat, vlon,
                                             numpy.isnan(masku), kx=1, ky=1,
                                             s=0)
