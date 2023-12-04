@@ -1,3 +1,20 @@
+'''
+Copyright (C) 2015-2024 OceanDataLab
+This file is part of lap_toolbox.
+
+lap_toolbox is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+lap_toolbox is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with lap_toolbox.  If not, see <http://www.gnu.org/licenses/>.
+'''
 import math
 import numpy
 from shapely import geometry
@@ -11,7 +28,7 @@ def boundary_weight(r, xcp, bbox, polybox):
     bboxr = [bbox[0] + r, bbox[1]-r, bbox[2] +r, bbox[3] -r]
     if ((xcp[0] >= bboxr[0]) and (xcp[0] <= bboxr[1])
          and (xcp[1] >= bboxr[2]) and (xcp[1] <= bboxr[3]):
-         wp=1
+         wp = 1
     else:
          circle = geometry.Point(xcp[0], xcp[1]).buffer(r)
          wp = c.intersection(polybox)/ (2 * math.pi * r)
