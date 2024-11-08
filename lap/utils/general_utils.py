@@ -164,9 +164,9 @@ def gather_data(p, list_var_adv, listGr, listTr) -> dict:
 
 
 def make_list_particles(grid) -> None:
-    grid.lon1d = + grid.lon.ravel()
-    grid.lat1d = + grid.lat.ravel()
-    grid.mask1d = + grid.mask.ravel()
+    grid.lon1d = grid.lon.ravel()
+    grid.lat1d = grid.lat.ravel()
+    grid.mask1d = grid.mask.ravel()
     grid.lon1d = grid.lon1d[~numpy.isnan(grid.mask1d)]
     grid.lat1d = grid.lat1d[~numpy.isnan(grid.mask1d)]
     grid.mask1d = grid.mask1d[~numpy.isnan(grid.mask1d)]

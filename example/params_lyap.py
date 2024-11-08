@@ -18,14 +18,14 @@ parameter_grid = (17., 35., 0.04, -43, -33, 0.04)
 box = [10., 50., -50., -20.]
 # First time of advection (in CNES julian days)
 reference = datetime.datetime(1970, 1,1)
-first_date = datetime.datetime(2021,2 , 12) # 20819
-last_date = datetime.datetime(2021,1 , 14) # 20819
+first_date = datetime.datetime(2020,2 , 12) # 20819
+last_date = datetime.datetime(2020,1 , 14) # 20819
 
 ## -- ADVECTION PARAMETER -- ## 
 # Time step for advection (in days)
 adv_time_step = -0.11
 # parameters for random walk to simulate diffusion
-scale = 1.
+scale = 0.
 # Diffusion parameter (sigma = 0.00000035)
 sigma = 0
 K = 0
@@ -36,7 +36,7 @@ stationary = False
 
 # -- Set up velocity for advection -- ##
 # Path for data
-vel_input_dir = '/mnt/data'
+vel_input_dir = '/mnt/data_b/satellite/l4/cmems_008_047/'
 # Class of the velocity file to read
 vel_format = 'regular_netcdf'
 # Name of velocity and coordinate variables
@@ -45,9 +45,9 @@ name_lat = 'latitude'
 name_u = 'ugos'
 name_v = 'vgos'
 # List of velocity files to use
-pattern = 'nrt_global_allsat_phy_l4_'
+pattern = 'dt_global_allsat_phy_l4_'
 import re
-MATCH = re.compile(r"nrt_global_allsat_phy_l4_(\d{4})(\d{2})(\d{2})_(\d{8}).nc").search
+MATCH = re.compile(r"dt_global_allsat_phy_l4_(\d{4})(\d{2})(\d{2})_(\d{8}).nc").search
 depth = None
 # Time step between two velocity files
 vel_step = 1.

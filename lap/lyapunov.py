@@ -83,7 +83,7 @@ def advection(p, npa_lon: numpy.ndarray, npa_lat: float, dic_vel: dict,
                 _diff = (numpy.datetime64(curdate) - dic_vel['time'])
                 ind_t = numpy.argmin(abs(_diff), out=None)
                 dt_vel = ((numpy.datetime64(curdate) - dic_vel['time'][ind_t])
-                          /(dic_vel['time'][ind_t+1] - dic_vel['time'][ind_t]))
+                          /(dic_vel['time'][ind_t-1] - dic_vel['time'][ind_t]))
             if dic_vel['time'][ind_t] > numpy.datetime64(curdate) :
                 ind_t = max(0, ind_t - 1)
             if ind_t > len(dic_vel['time']) - 1:

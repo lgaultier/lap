@@ -8,7 +8,7 @@ Classes are:
 import sys
 import netCDF4
 import numpy
-import scipy
+from scipy import interpolate
 from scipy.ndimage import filters
 from scipy.interpolate import griddata
 import logging
@@ -505,7 +505,7 @@ def read_trajectory(infile:str, list_var: list) -> dict:
 
 
 def interp_vel(VEL:dict, coord:dict) -> dict:
-    interp2d = scipy.interpolate.interp2d
+    interp2d = interpolate.RectBivariateSpline
     _inte = {}
     _inte['time'] = coord['time']
     for key in VEL.keys():
@@ -522,13 +522,13 @@ def interp_vel(VEL:dict, coord:dict) -> dict:
                 _indlat = numpy.where(nlat == 25.875)
 
                 _tmp = interp2d(nlon, nlat,
-                                VEL[key]['array'][t, :, :])
+                                VEL[key]['array'][t, :, :].T)
                 _inte[key].append(_tmp)
     else:
         for key in VEL.keys():
             nlon = VEL[key]['lon']
             nlat = VEL[key]['lat']
             _tmp = interp2d(nlon, nlat,
-                            VEL[key]['array'][t, :, :])
+                            VEL[key]['array'][0, :, :].T)
             _inte[key] = list([_tmp, ])
     return _inte
